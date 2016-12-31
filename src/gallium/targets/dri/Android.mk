@@ -44,7 +44,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libglapi \
 	libz \
 	liblog \
-	libsync
+	libsync \
+    libhardware
 
 # If Android version >=8 MESA should static link libexpat else should dynamic link
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 27; echo $$?), 0)
