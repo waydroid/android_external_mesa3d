@@ -29,6 +29,8 @@ LOCAL_C_INCLUDES += \
 	$(MESA_TOP)/src \
 	$(MESA_TOP)/include
 
+LOCAL_SHARED_LIBRARIES += liblog
+
 MESA_VERSION := $(shell cat $(MESA_TOP)/VERSION)
 LOCAL_CFLAGS += \
 	-O3 \
@@ -40,7 +42,8 @@ LOCAL_CFLAGS += \
 	-Wno-initializer-overrides \
 	-Wno-mismatched-tags \
 	-DPACKAGE_VERSION=\"$(MESA_VERSION)\" \
-	-DPACKAGE_BUGREPORT=\"https://gitlab.freedesktop.org/mesa/mesa/-/issues\"
+	-DPACKAGE_BUGREPORT=\"https://gitlab.freedesktop.org/mesa/mesa/-/issues\" \
+	-DHAVE_ANDROID_PLATFORM
 
 # XXX: The following __STDC_*_MACROS defines should not be needed.
 # It's likely due to a bug elsewhere, but let's temporarily add them
