@@ -1469,10 +1469,7 @@ swrast_create_image_android_native_buffer(_EGLDisplay *disp, _EGLContext *ctx,
       return NULL;
    }
 
-   if (!_eglInitImage(&dri2_img->base, disp)) {
-      free(dri2_img);
-      return NULL;
-   }
+   _eglInitImage(&dri2_img->base, disp);
 
    map = dri2_get_mapping_by_format(format);
    if (!map)
