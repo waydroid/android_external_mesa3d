@@ -739,7 +739,7 @@ static const struct dri2_format_mapping r8_g8b8_mapping = {
      { 1, 1, 1, __DRI_IMAGE_FORMAT_GR88 } }
 };
 
-static __DRIimage *
+__DRIimage *
 dri2_create_image_from_winsys(__DRIscreen *_screen,
                               int width, int height, const struct dri2_format_mapping *map,
                               int num_handles, struct winsys_handle *whandle,

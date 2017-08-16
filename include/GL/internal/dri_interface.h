@@ -31,7 +31,7 @@
  * between a DRI driver and driver loader.  Currently, the most common driver
  * loader is the XFree86 libGL.so.  However, other loaders do exist, and in
  * the future the server-side libglx.a will also be a loader.
- * 
+ *
  * \author Kevin E. Martin <kevin@precisioninsight.com>
  * \author Ian Romanick <idr@us.ibm.com>
  * \author Kristian Høgsberg <krh@redhat.com>
@@ -51,6 +51,7 @@ typedef struct drm_clip_rect drm_clip_rect_t;
 #include <GL/gl.h>
 
 #include <stdint.h>
+#include <stdbool.h>
 
 /**
  * \name DRI interface structures
@@ -66,6 +67,7 @@ typedef struct __DRIdrawableRec		__DRIdrawable;
 typedef struct __DRIconfigRec		__DRIconfig;
 typedef struct __DRIframebufferRec	__DRIframebuffer;
 typedef struct __DRIversionRec		__DRIversion;
+typedef struct __DRIimageRec        	__DRIimage;
 
 typedef struct __DRIcoreExtensionRec		__DRIcoreExtension;
 typedef struct __DRIextensionRec		__DRIextension;
@@ -163,14 +165,14 @@ struct __DRIframeTrackingExtensionRec {
 
     /**
      * Enable or disable frame usage tracking.
-     * 
+     *
      * \since Internal API version 20030317.
      */
     int (*frameTracking)(__DRIdrawable *drawable, GLboolean enable);
 
     /**
      * Retrieve frame usage information.
-     * 
+     *
      * \since Internal API version 20030317.
      */
     int (*queryFrameTracking)(__DRIdrawable *drawable,
@@ -237,7 +239,7 @@ struct __DRItexBufferExtensionRec {
 
     /**
      * Method to override base texture image with the contents of a
-     * __DRIdrawable. 
+     * __DRIdrawable.
      *
      * For GLX_EXT_texture_from_pixmap with AIGLX.  Deprecated in favor of
      * setTexBuffer2 in version 2 of this interface
@@ -586,7 +588,7 @@ struct __DRIsystemTimeExtensionRec {
 
     /**
      * Get the media stream counter (MSC) rate.
-     * 
+     *
      * Matching the definition in GLX_OML_sync_control, this function returns
      * the rate of the "media stream counter".  In practical terms, this is
      * the frame refresh rate of the display.
@@ -829,7 +831,7 @@ struct __DRIuseInvalidateExtensionRec {
 #define __DRI_ATTRIB_MAX			54
 
 /* __DRI_ATTRIB_RENDER_TYPE */
-#define __DRI_ATTRIB_RGBA_BIT			0x01	
+#define __DRI_ATTRIB_RGBA_BIT			0x01
 #define __DRI_ATTRIB_COLOR_INDEX_BIT		0x02
 #define __DRI_ATTRIB_LUMINANCE_BIT		0x04
 #define __DRI_ATTRIB_FLOAT_BIT			0x08
@@ -920,7 +922,7 @@ struct __DRIcoreExtensionRec {
 /**
  * Stored version of some component (i.e., server-side DRI module, kernel-side
  * DRM, etc.).
- * 
+ *
  * \todo
  * There are several data structures that explicitly store a major version,
  * minor version, and patch level.  These structures should be modified to
@@ -935,7 +937,7 @@ struct __DRIversionRec {
 /**
  * Framebuffer information record.  Used by libGL to communicate information
  * about the framebuffer to the driver's \c __driCreateNewScreen function.
- * 
+ *
  * In XFree86, most of this information is derrived from data returned by
  * calling \c XF86DRIGetDeviceInfo.
  *
@@ -976,7 +978,7 @@ struct __DRIlegacyExtensionRec {
 				    const __DRIversion *dri_version,
 				    const __DRIversion *drm_version,
 				    const __DRIframebuffer *frame_buffer,
-				    void *pSAREA, int fd, 
+				    void *pSAREA, int fd,
 				    const __DRIextension **extensions,
 				    const __DRIconfig ***driver_configs,
 				    void *loaderPrivate);
@@ -1001,8 +1003,10 @@ struct __DRIlegacyExtensionRec {
  * conjunction with the core extension.
  */
 #define __DRI_SWRAST "DRI_SWRast"
-#define __DRI_SWRAST_VERSION 4
+#define __DRI_SWRAST_VERSION 5
 
+struct winsys_handle;
+struct dri2_format_mapping;
 struct __DRIswrastExtensionRec {
     __DRIextension base;
 
@@ -1049,6 +1053,16 @@ struct __DRIswrastExtensionRec {
                                     const __DRIconfig ***driver_configs,
                                     void *loaderPrivate);
 
+   /**
+    * create a dri image from native window system handle
+    *
+    * \since version 5
+    */
+   __DRIimage *(*createImageFromWinsys)(__DRIscreen *_screen,
+                                        int width, int height, const struct dri2_format_mapping *map,
+                                        int num_handles, struct winsys_handle *whandle,
+                                        bool is_protected_content,
+                                        void *loaderPrivate);
 };
 
 /** Common DRI function definitions, shared among DRI2 and Image extensions
@@ -1508,7 +1522,6 @@ enum __DRIChromaSiting {
 /* Available in version 16 */
 #define __DRI_IMAGE_FORMAT_MODIFIER_ATTRIB_PLANE_COUNT   0x0001
 
-typedef struct __DRIimageRec          __DRIimage;
 typedef struct __DRIimageExtensionRec __DRIimageExtension;
 struct __DRIimageExtensionRec {
     __DRIextension base;
