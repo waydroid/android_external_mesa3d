@@ -750,7 +750,6 @@ static const struct dri2_extension_match optional_core_extensions[] = {
    { __DRI2_BUFFER_DAMAGE, 1, offsetof(struct dri2_egl_display, buffer_damage) },
    { __DRI2_RENDERER_QUERY, 1, offsetof(struct dri2_egl_display, rendererQuery) },
    { __DRI2_INTEROP, 1, offsetof(struct dri2_egl_display, interop) },
-   { __DRI_IMAGE, 1, offsetof(struct dri2_egl_display, image) },
    { __DRI2_FLUSH_CONTROL, 1, offsetof(struct dri2_egl_display, flush_control) },
    { __DRI2_BLOB, 1, offsetof(struct dri2_egl_display, blob) },
    { __DRI_MUTABLE_RENDER_BUFFER_DRIVER, 1, offsetof(struct dri2_egl_display, mutable_render_buffer) },
