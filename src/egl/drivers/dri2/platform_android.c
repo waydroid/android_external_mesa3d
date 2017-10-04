@@ -1969,7 +1969,6 @@ static struct dri2_egl_display_vtbl swrast_display_vtbl = {
     .create_pbuffer_surface = droid_create_pbuffer_surface,
     .destroy_surface = droid_destroy_surface,
     .create_image = swrast_create_image_khr,
-    .swap_interval = dri2_fallback_swap_interval,
     .swap_buffers = swrast_swap_buffers,
     .get_dri_drawable = dri2_surface_get_dri_drawable,
 };
