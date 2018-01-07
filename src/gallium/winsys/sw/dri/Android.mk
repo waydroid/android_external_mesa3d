@@ -31,5 +31,23 @@ LOCAL_SRC_FILES := $(C_SOURCES)
 
 LOCAL_MODULE := libmesa_winsys_sw_dri
 
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 27; echo $$?), 0)
+LOCAL_C_INCLUDES += \
+	frameworks/native/libs/nativebase/include \
+	frameworks/native/libs/nativewindow/include \
+	frameworks/native/libs/arect/include \
+	system/core/libsystem/include
+
+LOCAL_HEADER_LIBRARIES += \
+	libcutils_headers \
+	libsystem_headers \
+	libnativebase_headers \
+	libhardware_headers
+endif
+
+ifeq ($(filter $(MESA_ANDROID_MAJOR_VERSION), 4 5 6 7),)
+LOCAL_SHARED_LIBRARIES += libnativewindow
+endif
+
 include $(GALLIUM_COMMON_MK)
 include $(BUILD_STATIC_LIBRARY)
