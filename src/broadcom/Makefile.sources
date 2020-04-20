@@ -20,9 +20,21 @@ BROADCOM_FILES = \
 	common/v3d_cpu_tiling.h \
 	common/v3d_debug.c \
 	common/v3d_debug.h \
+	common/v3d_device_info.c \
 	common/v3d_device_info.h \
 	common/v3d_limits.h \
 	common/v3d_macros.h \
+	$()
+
+BROADCOM_QPU_FILES = \
+	qpu/qpu_disasm.c \
+	qpu/qpu_disasm.h \
+	qpu/qpu_instr.c \
+	qpu/qpu_instr.h \
+	qpu/qpu_pack.c \
+	$()
+
+BROADCOM_COMPILER_FILES = \
 	compiler/nir_to_vir.c \
 	compiler/vir.c \
 	compiler/vir_dump.c \
@@ -42,13 +54,10 @@ BROADCOM_FILES = \
 	compiler/v3d_nir_lower_image_load_store.c \
 	compiler/v3d_nir_lower_io.c \
 	compiler/v3d_nir_lower_line_smooth.c \
+	compiler/v3d_nir_lower_logic_ops.c \
+	compiler/v3d_nir_lower_robust_buffer_access.c \
 	compiler/v3d_nir_lower_scratch.c \
 	compiler/v3d_nir_lower_txf_ms.c \
-	qpu/qpu_disasm.c \
-	qpu/qpu_disasm.h \
-	qpu/qpu_instr.c \
-	qpu/qpu_instr.h \
-	qpu/qpu_pack.c \
 	$()
 
 BROADCOM_PER_VERSION_SOURCES = \
@@ -59,4 +68,3 @@ BROADCOM_DECODER_FILES = \
 	cle/v3d_decoder.c \
 	cle/v3d_decoder.h \
 	$()
-

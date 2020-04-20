@@ -18,15 +18,20 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
-#
 
-LOCAL_PATH := $(call my-dir)
+include $(CLEAR_VARS)
 
-# Import variables
-include $(LOCAL_PATH)/Makefile.sources
+LOCAL_MODULE := libmesa_broadcom_qpu
 
-include $(LOCAL_PATH)/Android.common.mk
-include $(LOCAL_PATH)/Android.compiler.mk
-include $(LOCAL_PATH)/Android.genxml.mk
-include $(LOCAL_PATH)/Android.cle.mk
-include $(LOCAL_PATH)/Android.qpu.mk
+LOCAL_MODULE_CLASS := STATIC_LIBRARIES
+
+LOCAL_SRC_FILES := $(BROADCOM_QPU_FILES)
+
+LOCAL_C_INCLUDES += $(MESA_TOP)/src/gallium/include
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
+
+LOCAL_SHARED_LIBRARIES := libexpat libz
+
+include $(MESA_COMMON_MK)
+include $(BUILD_STATIC_LIBRARY)

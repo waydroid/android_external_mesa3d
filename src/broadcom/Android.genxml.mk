@@ -77,6 +77,7 @@ $(intermediates)/broadcom/cle/v3d_xml.h: $(addprefix $(MESA_TOP)/src/broadcom/,$
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
 	$(MESA_TOP)/src/broadcom/cle \
 	$(intermediates)/broadcom/cle \
+	$(intermediates)/broadcom \
 	$(intermediates)
 
 include $(MESA_COMMON_MK)

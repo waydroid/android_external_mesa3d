@@ -43,6 +43,7 @@ SUBDIRS += winsys/radeon/drm drivers/r300
 SUBDIRS += winsys/radeon/drm drivers/r600
 SUBDIRS += winsys/radeon/drm winsys/amdgpu/drm drivers/radeonsi
 SUBDIRS += winsys/vc4/drm drivers/vc4
+SUBDIRS += winsys/v3d/drm drivers/v3d
 SUBDIRS += winsys/virgl/common winsys/virgl/drm winsys/virgl/vtest drivers/virgl
 SUBDIRS += winsys/svga/drm drivers/svga
 SUBDIRS += winsys/etnaviv/drm drivers/etnaviv drivers/renderonly
