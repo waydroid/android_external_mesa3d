@@ -79,7 +79,7 @@ static const struct drm_driver_descriptor *driver_descriptors[] = {
    &msm_driver_descriptor,
    &virtio_gpu_driver_descriptor,
    &v3d_driver_descriptor,
-#if defined(GALLIUM_VC4)
+#ifndef USE_V3D_KMSRO
    &vc4_driver_descriptor,
 #endif
    &panfrost_driver_descriptor,

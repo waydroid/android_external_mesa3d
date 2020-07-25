@@ -33,4 +33,8 @@ LOCAL_C_INCLUDES += \
 	$(MESA_TOP)/src/freedreno/ir3 \
 	$(MESA_TOP)/src/freedreno/registers
 
+ifeq ($(TARGET_USE_V3D_KMSRO),true)
+	LOCAL_CFLAGS += -DUSE_V3D_KMSRO
+endif
+
 include $(MESA_COMMON_MK)
