@@ -190,7 +190,7 @@ gather_vars_written(struct copy_prop_var_state *state,
                nir_src_as_deref(*nir_get_shader_call_payload_src(intrin));
 
             nir_component_mask_t mask =
-               BITFIELD_MASK(glsl_get_vector_elements(payload->type));
+               (nir_component_mask_t) BITFIELD_MASK(glsl_get_vector_elements(payload->type));
 
             struct hash_entry *ht_entry =
                _mesa_hash_table_search(written->derefs, payload);
@@ -1147,7 +1147,7 @@ copy_prop_vars_block(struct copy_prop_var_state *state,
          nir_deref_and_path payload = {
             nir_src_as_deref(*nir_get_shader_call_payload_src(intrin)), NULL};
          nir_component_mask_t full_mask =
-            BITFIELD_MASK(glsl_get_vector_elements(payload.instr->type));
+            (nir_component_mask_t) BITFIELD_MASK(glsl_get_vector_elements(payload.instr->type));
          kill_aliases(state, copies, &payload, full_mask);
          break;
       }
