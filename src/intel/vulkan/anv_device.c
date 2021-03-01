@@ -797,8 +797,12 @@ anv_i915_physical_device_get_parameters(struct anv_physical_device *device)
    device->has_exec_timeline =
       anv_gem_get_param(fd, I915_PARAM_HAS_EXEC_TIMELINE_FENCES);
 
+#if defined(ANDROID)
+   device->has_mmap_offset = false;
+#else
    device->has_mmap_offset =
       anv_gem_get_param(fd, I915_PARAM_MMAP_GTT_VERSION) >= 4;
+#endif
 
    device->has_userptr_probe =
       anv_gem_get_param(fd, I915_PARAM_HAS_USERPTR_PROBE);
