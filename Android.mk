@@ -64,7 +64,6 @@ gallium_drivers := \
 	vmwgfx.HAVE_GALLIUM_VMWGFX \
 	virgl.HAVE_GALLIUM_VIRGL \
 	etnaviv.HAVE_GALLIUM_ETNAVIV \
-	iris.HAVE_GALLIUM_IRIS \
 	lima.HAVE_GALLIUM_LIMA \
 	panfrost.HAVE_GALLIUM_PANFROST
 
@@ -74,6 +73,11 @@ gallium_drivers += \
 else
 gallium_drivers += \
 	vc4.HAVE_GALLIUM_VC4
+endif
+
+ifneq ($(filter x86 x86_64, $(TARGET_ARCH)),)
+gallium_drivers += \
+	iris.HAVE_GALLIUM_IRIS
 endif
 
 ifeq ($(BOARD_GPU_DRIVERS),all)
