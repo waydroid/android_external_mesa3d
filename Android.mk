@@ -62,13 +62,19 @@ gallium_drivers := \
 	r600g.HAVE_GALLIUM_R600 \
 	radeonsi.HAVE_GALLIUM_RADEONSI \
 	vmwgfx.HAVE_GALLIUM_VMWGFX \
-	vc4.HAVE_GALLIUM_VC4 \
-	v3d.HAVE_GALLIUM_V3D \
 	virgl.HAVE_GALLIUM_VIRGL \
 	etnaviv.HAVE_GALLIUM_ETNAVIV \
 	iris.HAVE_GALLIUM_IRIS \
 	lima.HAVE_GALLIUM_LIMA \
 	panfrost.HAVE_GALLIUM_PANFROST
+
+ifeq ($(TARGET_USE_V3D),true)
+gallium_drivers += \
+	v3d.HAVE_GALLIUM_V3D
+else
+gallium_drivers += \
+	vc4.HAVE_GALLIUM_VC4
+endif
 
 ifeq ($(BOARD_GPU_DRIVERS),all)
 MESA_BUILD_CLASSIC := $(filter HAVE_%, $(subst ., , $(classic_drivers)))
