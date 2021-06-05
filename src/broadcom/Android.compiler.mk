@@ -33,7 +33,16 @@ LOCAL_C_INCLUDES += \
 
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
 
-LOCAL_SHARED_LIBRARIES := libexpat libz
+LOCAL_SHARED_LIBRARIES := libz
+
+# If Android version >=8 MESA should static link libexpat else should dynamic link
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 27; echo $$?), 0)
+LOCAL_STATIC_LIBRARIES += \
+	libexpat
+else
+LOCAL_SHARED_LIBRARIES += \
+	libexpat
+endif
 
 LOCAL_STATIC_LIBRARIES := \
 	libmesa_broadcom_genxml \
