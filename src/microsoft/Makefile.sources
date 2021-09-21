@@ -1,0 +1,17 @@
+COMPILER_FILES = \
+	compiler/dxil_buffer.c \
+	compiler/dxil_container.c \
+	compiler/dxil_dump.c \
+	compiler/dxil_enums.c \
+	compiler/dxil_function.c \
+	compiler/dxil_module.c \
+	compiler/dxil_nir.c \
+	compiler/dxil_nir_lower_int_samplers.c \
+	compiler/dxil_signature.c \
+	compiler/nir_to_dxil.c
+
+COMPILER_GENERATED_FILES = \
+	compiler/dxil_nir_algebraic.c
+
+RESOURCE_STATE_FILES = \
+	resource_state_manager/D3D12ResourceState.cpp
