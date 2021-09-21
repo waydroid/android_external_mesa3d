@@ -1,0 +1,29 @@
+compiler_FILES := \
+	compiler/dxcapi.h \
+	compiler/dxil_buffer.c \
+	compiler/dxil_buffer.h \
+	compiler/dxil_buffer_test.c \
+	compiler/dxil_container.c \
+	compiler/dxil_container.h \
+	compiler/dxil_dump.c \
+	compiler/dxil_dump.h \
+	compiler/dxil_dump_decls.h \
+	compiler/dxil_enums.c \
+	compiler/dxil_enums.h \
+	compiler/dxil_function.c \
+	compiler/dxil_function.h \
+	compiler/dxil_internal.h \
+	compiler/dxil_module.c \
+	compiler/dxil_module.h \
+	compiler/dxil_nir.c \
+	compiler/dxil_nir.h \
+	compiler/dxil_nir_lower_int_samplers.c \
+	compiler/dxil_nir_lower_int_samplers.h \
+	compiler/dxil_signature.c \
+	compiler/dxil_signature.h \
+	compiler/nir_to_dxil.c \
+	compiler/nir_to_dxil.h
+
+resourcestatemanager_FILES := \
+	resource_state_manager/D3D12ResourceState.cpp \
+	resource_state_manager/D3D12ResourceState.h

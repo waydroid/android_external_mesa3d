@@ -1,0 +1,6 @@
+CPP_SOURCES := \
+	d3d12_wgl_framebuffer.cpp
+
+C_SOURCES := \
+	d3d12_wgl_winsys.c \
+	d3d12_wgl_public.h

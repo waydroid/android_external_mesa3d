@@ -65,7 +65,8 @@ gallium_drivers := \
 	virgl.HAVE_GALLIUM_VIRGL \
 	etnaviv.HAVE_GALLIUM_ETNAVIV \
 	lima.HAVE_GALLIUM_LIMA \
-	panfrost.HAVE_GALLIUM_PANFROST
+	panfrost.HAVE_GALLIUM_PANFROST \
+	d3d12.HAVE_GALLIUM_D3D12
 
 ifeq ($(TARGET_USE_V3D),true)
 gallium_drivers += \
