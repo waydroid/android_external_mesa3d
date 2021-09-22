@@ -14,7 +14,8 @@ CPP_SOURCES := \
 	d3d12_resource.cpp \
 	d3d12_root_signature.cpp \
 	d3d12_screen.cpp \
-	d3d12_surface.cpp
+	d3d12_surface.cpp \
+	dxguids.cpp
 
 # Windows sets the %OS% environment variable, whilst Linux does not. As such,
 # we can use it to detect if the host is Windows.
