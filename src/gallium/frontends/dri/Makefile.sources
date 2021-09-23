@@ -15,3 +15,6 @@ dri2_SOURCES := \
 
 drisw_SOURCES := \
 	drisw.c
+
+dri_format_SOURCES := \
+	dri_format.c

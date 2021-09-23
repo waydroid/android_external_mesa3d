@@ -28,6 +28,27 @@ include $(LOCAL_PATH)/Makefile.sources
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
+	$(dri_format_SOURCES)
+
+LOCAL_C_INCLUDES := \
+	$(MESA_TOP)/src/mapi \
+	$(MESA_TOP)/src/mesa
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := \
+	$(LOCAL_PATH) \
+	$(LOCAL_C_INCLUDES)
+
+LOCAL_STATIC_LIBRARIES := \
+	libmesa_dri_common
+
+LOCAL_MODULE := libmesa_st_dri_format
+
+include $(GALLIUM_COMMON_MK)
+include $(BUILD_STATIC_LIBRARY)
+
+include $(CLEAR_VARS)
+
+LOCAL_SRC_FILES := \
 	$(common_SOURCES) \
 	$(dri2_SOURCES)
 
@@ -38,6 +59,9 @@ LOCAL_C_INCLUDES := \
 LOCAL_EXPORT_C_INCLUDE_DIRS := \
 	$(LOCAL_PATH) \
 	$(LOCAL_C_INCLUDES)
+
+LOCAL_WHOLE_STATIC_LIBRARIES := \
+	libmesa_st_dri_format
 
 LOCAL_STATIC_LIBRARIES := \
 	libmesa_dri_common
