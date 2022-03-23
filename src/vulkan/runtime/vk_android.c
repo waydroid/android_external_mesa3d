@@ -40,6 +40,13 @@ vk_common_AcquireImageANDROID(VkDevice _device,
    VK_FROM_HANDLE(vk_device, device, _device);
    VkResult result = VK_SUCCESS;
 
+   /* workaround for arc++ sw_sync fence deadlock issue): */
+   if (nativeFenceFd >= 0) {
+      sync_wait(nativeFenceFd, -1);
+      close(nativeFenceFd);
+      nativeFenceFd = -1;
+   }
+
    /* From https://source.android.com/devices/graphics/implement-vulkan :
     *
     *    "The driver takes ownership of the fence file descriptor and closes

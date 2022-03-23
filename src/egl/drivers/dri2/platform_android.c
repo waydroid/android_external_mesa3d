@@ -487,7 +487,7 @@ handle_in_fence_fd(struct dri2_egl_surface *dri2_surf, __DRIimage *img)
 
    validate_fence_fd(dri2_surf->in_fence_fd);
 
-   if (dri2_dpy->image->base.version >= 21 &&
+   if (0 && dri2_dpy->image->base.version >= 21 &&
        dri2_dpy->image->setInFenceFd != NULL) {
       dri2_dpy->image->setInFenceFd(img, dri2_surf->in_fence_fd);
    } else {
