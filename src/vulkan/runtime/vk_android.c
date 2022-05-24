@@ -74,6 +74,17 @@ vk_common_AcquireImageANDROID(VkDevice _device,
       }
    }
 
+   /* Workaround: If we don't wait on the CPU here fences can get stuck. Details
+    * are still TBD but from a historical similar issue this is likely due to
+    * rendering too far ahead and getting cycles with implicit sync.
+    */
+   if (nativeFenceFd >= 0) {
+      if (sync_wait(nativeFenceFd, -1) < 0) {
+         close(nativeFenceFd);
+         return VK_ERROR_DEVICE_LOST;
+      }
+   }
+
    if (semaphore != VK_NULL_HANDLE) {
       const VkImportSemaphoreFdInfoKHR info = {
          .sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR,
