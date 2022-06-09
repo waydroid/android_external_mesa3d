@@ -389,10 +389,21 @@ static void si_emit_guardband(struct si_context *ctx)
                               SI_TRACKED_PA_SU_HARDWARE_SCREEN_OFFSET,
                               S_028234_HW_SCREEN_OFFSET_X(hw_screen_offset_x >> 4) |
                                  S_028234_HW_SCREEN_OFFSET_Y(hw_screen_offset_y >> 4));
-   radeon_opt_set_context_reg(
-      ctx, R_028BE4_PA_SU_VTX_CNTL, SI_TRACKED_PA_SU_VTX_CNTL,
-      S_028BE4_PIX_CENTER(rs->half_pixel_center) | S_028BE4_ROUND_MODE(V_028BE4_X_ROUND_TO_EVEN) |
-         S_028BE4_QUANT_MODE(V_028BE4_X_16_8_FIXED_POINT_1_256TH + vp_as_scissor.quant_mode));
+
+   if( (ctx->family == CHIP_STONEY) 
+        ||(ctx->family == CHIP_RAVEN)
+        ||(ctx->family == CHIP_RAVEN2)) {
+      radeon_opt_set_context_reg(
+         ctx, R_028BE4_PA_SU_VTX_CNTL, SI_TRACKED_PA_SU_VTX_CNTL,
+         S_028BE4_PIX_CENTER(rs->half_pixel_center) |
+            S_028BE4_QUANT_MODE(V_028BE4_X_16_8_FIXED_POINT_1_256TH + vp_as_scissor.quant_mode));
+   } else {
+      radeon_opt_set_context_reg(
+         ctx, R_028BE4_PA_SU_VTX_CNTL, SI_TRACKED_PA_SU_VTX_CNTL,
+         S_028BE4_PIX_CENTER(rs->half_pixel_center) | S_028BE4_ROUND_MODE(V_028BE4_X_ROUND_TO_EVEN) |
+            S_028BE4_QUANT_MODE(V_028BE4_X_16_8_FIXED_POINT_1_256TH + vp_as_scissor.quant_mode));
+   }
+
    radeon_end_update_context_roll(ctx);
 }
 
