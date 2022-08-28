@@ -384,6 +384,7 @@ native_window_buffer_get_buffer_info(struct dri2_egl_display *dri2_dpy,
  */
 
 static const char cros_gralloc_module_name[] = "CrOS Gralloc";
+static const char gbm_gralloc_module_name[] = "GBM Memory Allocator";
 
 #define CROS_GRALLOC_DRM_GET_BUFFER_INFO               4
 #define CROS_GRALLOC_DRM_GET_USAGE                     5
@@ -405,7 +406,8 @@ cros_get_buffer_info(struct dri2_egl_display *dri2_dpy,
 {
    struct cros_gralloc0_buffer_info info;
 
-   if (strcmp(dri2_dpy->gralloc->common.name, cros_gralloc_module_name) == 0 &&
+   if ((strcmp(dri2_dpy->gralloc->common.name, cros_gralloc_module_name) == 0 ||
+       strcmp(dri2_dpy->gralloc->common.name, gbm_gralloc_module_name) == 0) &&
        dri2_dpy->gralloc->perform &&
        dri2_dpy->gralloc->perform(dri2_dpy->gralloc,
                                   CROS_GRALLOC_DRM_GET_BUFFER_INFO, buf->handle,
