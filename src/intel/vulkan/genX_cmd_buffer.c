@@ -2157,6 +2157,24 @@ genX(emit_apply_pipe_flushes)(struct anv_batch *batch,
 #endif
 
          pipe.CommandStreamerStallEnable = bits & ANV_PIPE_CS_STALL_BIT;
+#if GFX_VER == 8
+         /* From Broadwell PRM, volume 2a:
+          *    PIPE_CONTROL: Command Streamer Stall Enable:
+          *
+          *    "This bit must be always set when PIPE_CONTROL command is
+          *     programmed by GPGPU and MEDIA workloads, except for the cases
+          *     when only Read Only Cache Invalidation bits are set (State
+          *     Cache Invalidation Enable, Instruction cache Invalidation
+          *     Enable, Texture Cache Invalidation Enable, Constant Cache
+          *     Invalidation Enable). This is to WA FFDOP CG issue, this WA
+          *     need not implemented when FF_DOP_CG is disabled."
+          *
+          *    Since we do all the invalidation in the following PIPE_CONTROL,
+          *    if we got here, we need a stall.
+          */
+         pipe.CommandStreamerStallEnable |= current_pipeline == GPGPU;
+#endif
+
          pipe.StallAtPixelScoreboard = bits & ANV_PIPE_STALL_AT_SCOREBOARD_BIT;
 
          /* From Sandybridge PRM, volume 2, "1.7.3.1 Writing a Value to Memory":
@@ -6066,15 +6084,16 @@ genX(cmd_buffer_emit_gfx12_depth_wa)(struct anv_cmd_buffer *cmd_buffer,
                                      const struct isl_surf *surf)
 {
 #if GFX_VERx10 == 120
-   const bool fmt_is_d16 = surf->format == ISL_FORMAT_R16_UNORM;
+   const bool is_d16_1x_msaa = surf->format == ISL_FORMAT_R16_UNORM &&
+                               surf->samples == 1;
 
    switch (cmd_buffer->state.depth_reg_mode) {
    case ANV_DEPTH_REG_MODE_HW_DEFAULT:
-      if (!fmt_is_d16)
+      if (!is_d16_1x_msaa)
          return;
       break;
-   case ANV_DEPTH_REG_MODE_D16:
-      if (fmt_is_d16)
+   case ANV_DEPTH_REG_MODE_D16_1X_MSAA:
+      if (is_d16_1x_msaa)
          return;
       break;
    case ANV_DEPTH_REG_MODE_UNKNOWN:
@@ -6098,21 +6117,13 @@ genX(cmd_buffer_emit_gfx12_depth_wa)(struct anv_cmd_buffer *cmd_buffer,
     * Surface Format is D16_UNORM , surface type is not NULL & 1X_MSAA”.
     */
    anv_batch_write_reg(&cmd_buffer->batch, GENX(COMMON_SLICE_CHICKEN1), reg) {
-      reg.HIZPlaneOptimizationdisablebit = fmt_is_d16 && surf->samples == 1;
+      reg.HIZPlaneOptimizationdisablebit = is_d16_1x_msaa;
       reg.HIZPlaneOptimizationdisablebitMask = true;
    }
 
-   /* Wa_1806527549
-    *
-    * Set HIZ_CHICKEN (7018h) bit 13 = 1 when depth buffer is D16_UNORM.
-    */
-   anv_batch_write_reg(&cmd_buffer->batch, GENX(HIZ_CHICKEN), reg) {
-      reg.HZDepthTestLEGEOptimizationDisable = fmt_is_d16;
-      reg.HZDepthTestLEGEOptimizationDisableMask = true;
-   }
-
    cmd_buffer->state.depth_reg_mode =
-      fmt_is_d16 ? ANV_DEPTH_REG_MODE_D16 : ANV_DEPTH_REG_MODE_HW_DEFAULT;
+      is_d16_1x_msaa ? ANV_DEPTH_REG_MODE_D16_1X_MSAA :
+                       ANV_DEPTH_REG_MODE_HW_DEFAULT;
 #endif
 }
 
