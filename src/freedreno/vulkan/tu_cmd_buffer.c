@@ -4273,13 +4273,13 @@ tu6_writes_stencil(struct tu_cmd_buffer *cmd)
       (cmd->state.rb_stencil_cntl & A6XX_RB_STENCIL_CONTROL_ZFAIL_BF__MASK) >> A6XX_RB_STENCIL_CONTROL_ZFAIL_BF__SHIFT;
 
    bool stencil_front_op_writes =
-      front_pass_op != VK_STENCIL_OP_KEEP &&
-      front_fail_op != VK_STENCIL_OP_KEEP &&
+      front_pass_op != VK_STENCIL_OP_KEEP ||
+      front_fail_op != VK_STENCIL_OP_KEEP ||
       front_depth_fail_op != VK_STENCIL_OP_KEEP;
 
    bool stencil_back_op_writes =
-      back_pass_op != VK_STENCIL_OP_KEEP &&
-      back_fail_op != VK_STENCIL_OP_KEEP &&
+      back_pass_op != VK_STENCIL_OP_KEEP ||
+      back_fail_op != VK_STENCIL_OP_KEEP ||
       back_depth_fail_op != VK_STENCIL_OP_KEEP;
 
    return stencil_test_enable &&
@@ -4341,10 +4341,9 @@ tu6_emit_blend(struct tu_cs *cs, struct tu_cmd_buffer *cmd)
       }
    }
 
-   uint32_t blend_enable_mask =
-      (cmd->state.logic_op_enabled && cmd->state.rop_reads_dst) ?
-      color_write_enable : (cmd->state.pipeline_blend_enable &
-                            cmd->state.color_write_enable);
+   uint32_t blend_enable_mask = color_write_enable;
+   if (!(cmd->state.logic_op_enabled && cmd->state.rop_reads_dst))
+      blend_enable_mask &= cmd->state.pipeline_blend_enable;
 
    tu_cs_emit_pkt4(cs, REG_A6XX_SP_BLEND_CNTL, 1);
    tu_cs_emit(cs, cmd->state.sp_blend_cntl |

@@ -784,8 +784,8 @@ VkResult anv_CreatePipelineLayout(
 
    assert(pCreateInfo->sType == VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO);
 
-   layout = vk_object_alloc(&device->vk, pAllocator, sizeof(*layout),
-                            VK_OBJECT_TYPE_PIPELINE_LAYOUT);
+   layout = vk_object_zalloc(&device->vk, pAllocator, sizeof(*layout),
+                             VK_OBJECT_TYPE_PIPELINE_LAYOUT);
    if (layout == NULL)
       return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
 
@@ -1305,9 +1305,20 @@ VkResult anv_AllocateDescriptorSets(
       pDescriptorSets[i] = anv_descriptor_set_to_handle(set);
    }
 
-   if (result != VK_SUCCESS)
+   if (result != VK_SUCCESS) {
       anv_FreeDescriptorSets(_device, pAllocateInfo->descriptorPool,
                              i, pDescriptorSets);
+      /* The Vulkan 1.3.228 spec, section 14.2.3. Allocation of Descriptor Sets:
+       *
+       *   "If the creation of any of those descriptor sets fails, then the
+       *    implementation must destroy all successfully created descriptor
+       *    set objects from this command, set all entries of the
+       *    pDescriptorSets array to VK_NULL_HANDLE and return the error."
+       */
+      for (i = 0; i < pAllocateInfo->descriptorSetCount; i++)
+         pDescriptorSets[i] = VK_NULL_HANDLE;
+
+   }
 
    return result;
 }

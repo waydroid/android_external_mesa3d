@@ -287,6 +287,18 @@ genX(cmd_buffer_emit_state_base_address)(struct anv_cmd_buffer *cmd_buffer)
 #if GFX_VERx10 == 125
       pc.InstructionCacheInvalidateEnable = true;
 #endif
+#if GFX_VER >= 9 && GFX_VER <= 11
+      /* From the SKL PRM, Vol. 2a, "PIPE_CONTROL",
+       *
+       *    "Workaround : “CS Stall” bit in PIPE_CONTROL command must be
+       *     always set for GPGPU workloads when “Texture Cache Invalidation
+       *     Enable” bit is set".
+       *
+       * Workaround stopped appearing in TGL PRMs.
+       */
+      pc.CommandStreamerStallEnable =
+         cmd_buffer->state.current_pipeline == GPGPU;
+#endif
       anv_debug_dump_pc(pc);
    }
 }
@@ -2268,6 +2280,19 @@ genX(emit_apply_pipe_flushes)(struct anv_batch *batch,
             bits & ANV_PIPE_TEXTURE_CACHE_INVALIDATE_BIT;
          pipe.InstructionCacheInvalidateEnable =
             bits & ANV_PIPE_INSTRUCTION_CACHE_INVALIDATE_BIT;
+
+#if GFX_VER >= 9 && GFX_VER <= 11
+         /* From the SKL PRM, Vol. 2a, "PIPE_CONTROL",
+          *
+          *    "Workaround : “CS Stall” bit in PIPE_CONTROL command must be
+          *     always set for GPGPU workloads when “Texture Cache
+          *     Invalidation Enable” bit is set".
+          *
+          * Workaround stopped appearing in TGL PRMs.
+          */
+         if (current_pipeline == GPGPU && pipe.TextureCacheInvalidationEnable)
+            pipe.CommandStreamerStallEnable = true;
+#endif
 
          /* From the SKL PRM, Vol. 2a, "PIPE_CONTROL",
           *
@@ -7156,6 +7181,12 @@ void genX(CmdEndRendering)(
       }
    }
 #endif
+
+   trace_intel_end_render_pass(&cmd_buffer->trace,
+                               gfx->render_area.extent.width,
+                               gfx->render_area.extent.height,
+                               gfx->color_att_count,
+                               gfx->samples);
 
    anv_cmd_buffer_reset_rendering(cmd_buffer);
 }

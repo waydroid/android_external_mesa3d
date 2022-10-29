@@ -445,8 +445,11 @@ get_glsl_type(struct ntv_context *ctx, const struct glsl_type *type)
          types[i] = get_glsl_type(ctx, glsl_get_struct_field(type, i));
       ret = spirv_builder_type_struct(&ctx->builder, types,
                                       glsl_get_length(type));
-      for (unsigned i = 0; i < glsl_get_length(type); i++)
-         spirv_builder_emit_member_offset(&ctx->builder, ret, i, glsl_get_struct_field_offset(type, i));
+      for (unsigned i = 0; i < glsl_get_length(type); i++) {
+         int32_t offset = glsl_get_struct_field_offset(type, i);
+         if (offset >= 0)
+            spirv_builder_emit_member_offset(&ctx->builder, ret, i, offset);
+      }
    } else
       unreachable("Unhandled GLSL type");
 
@@ -1614,7 +1617,7 @@ emit_so_outputs(struct ntv_context *ctx,
                for (unsigned c = 0; c < so_output.num_components; c++) {
                   components[c] = so_output.start_component + c;
                   /* this is the second half of a 2 * vec4 array */
-                  if (slot == VARYING_SLOT_CLIP_DIST1)
+                  if (slot == VARYING_SLOT_CLIP_DIST1 || slot == VARYING_SLOT_CULL_DIST1)
                      components[c] += 4;
                }
                /* OpVectorShuffle can select vector members into a differently-sized vector */
@@ -1645,7 +1648,7 @@ emit_so_outputs(struct ntv_context *ctx,
                 uint32_t member = so_output.start_component + c;
                 SpvId base_type = get_glsl_basetype(ctx, glsl_get_base_type(bare_type));
 
-                if (slot == VARYING_SLOT_CLIP_DIST1)
+                if (slot == VARYING_SLOT_CLIP_DIST1 || slot == VARYING_SLOT_CULL_DIST1)
                    member += 4;
                 components[idx] = spirv_builder_emit_composite_extract(&ctx->builder, base_type, src, &member, 1);
                 if (glsl_type_is_64bit(bare_type)) {
@@ -1808,29 +1811,29 @@ alu_instr_src_components(const nir_alu_instr *instr, unsigned src)
 }
 
 static SpvId
-get_alu_src(struct ntv_context *ctx, nir_alu_instr *alu, unsigned src)
+get_alu_src(struct ntv_context *ctx, nir_alu_instr *alu, unsigned src, SpvId *raw_value)
 {
-   SpvId raw_value = get_alu_src_raw(ctx, alu, src);
+   *raw_value = get_alu_src_raw(ctx, alu, src);
 
    unsigned num_components = alu_instr_src_components(alu, src);
    unsigned bit_size = nir_src_bit_size(alu->src[src].src);
    nir_alu_type type = nir_op_infos[alu->op].input_types[src];
 
    if (bit_size == 1)
-      return raw_value;
+      return *raw_value;
    else {
       switch (nir_alu_type_get_base_type(type)) {
       case nir_type_bool:
          unreachable("bool should have bit-size 1");
 
       case nir_type_int:
-         return bitcast_to_ivec(ctx, raw_value, bit_size, num_components);
+         return bitcast_to_ivec(ctx, *raw_value, bit_size, num_components);
 
       case nir_type_uint:
-         return raw_value;
+         return *raw_value;
 
       case nir_type_float:
-         return bitcast_to_fvec(ctx, raw_value, bit_size, num_components);
+         return bitcast_to_fvec(ctx, *raw_value, bit_size, num_components);
 
       default:
          unreachable("unknown nir_alu_type");
@@ -1901,25 +1904,13 @@ needs_derivative_control(nir_alu_instr *alu)
    }
 }
 
-static SpvId
-unswizzle_src(struct ntv_context *ctx, nir_ssa_def *ssa, SpvId src, unsigned num_components)
-{
-   /* value may have already been cast to ivec, so cast back */
-   SpvId cast_type = get_uvec_type(ctx, ssa->bit_size, num_components);
-   src = emit_bitcast(ctx, cast_type, src);
-
-   /* extract from swizzled vec */
-   SpvId type = spirv_builder_type_uint(&ctx->builder, ssa->bit_size);
-   uint32_t idx = 0;
-   return spirv_builder_emit_composite_extract(&ctx->builder, type, src, &idx, 1);
-}
-
 static void
 emit_alu(struct ntv_context *ctx, nir_alu_instr *alu)
 {
    SpvId src[NIR_MAX_VEC_COMPONENTS];
+   SpvId raw_src[NIR_MAX_VEC_COMPONENTS];
    for (unsigned i = 0; i < nir_op_infos[alu->op].num_inputs; i++)
-      src[i] = get_alu_src(ctx, alu, i);
+      src[i] = get_alu_src(ctx, alu, i, &raw_src[i]);
 
    SpvId dest_type = get_dest_type(ctx, &alu->dest.dest,
                                    nir_op_infos[alu->op].output_type);
@@ -1929,34 +1920,6 @@ emit_alu(struct ntv_context *ctx, nir_alu_instr *alu)
 
    if (needs_derivative_control(alu))
       spirv_builder_emit_cap(&ctx->builder, SpvCapabilityDerivativeControl);
-
-   /* modify params here */
-   switch (alu->op) {
-   /* Offset must be an integer type scalar.
-    * Offset is the lowest-order bit of the bit field.
-    * It is consumed as an unsigned value.
-    *
-    * Count must be an integer type scalar.
-    *
-    * if these ops have more than one component in the dest, then their offset and count
-    * are swizzled like ssa_1.xxx, but only a single scalar can be provided
-    */
-   case nir_op_ubitfield_extract:
-   case nir_op_ibitfield_extract:
-      if (num_components > 1) {
-         src[1] = unswizzle_src(ctx, alu->src[1].src.ssa, src[1], num_components);
-         src[2] = unswizzle_src(ctx, alu->src[2].src.ssa, src[2], num_components);
-      }
-      break;
-   case nir_op_bitfield_insert:
-      if (num_components > 1) {
-         src[2] = unswizzle_src(ctx, alu->src[2].src.ssa, src[2], num_components);
-         src[3] = unswizzle_src(ctx, alu->src[3].src.ssa, src[3], num_components);
-      }
-      break;
-   default:
-      break;
-   }
 
    SpvId result = 0;
    switch (alu->op) {
@@ -2067,9 +2030,13 @@ emit_alu(struct ntv_context *ctx, nir_alu_instr *alu)
       result = emit_builtin_unop(ctx, GLSLstd450PackHalf2x16, get_dest_type(ctx, &alu->dest.dest, nir_type_uint), src[0]);
       break;
 
+   case nir_op_unpack_64_2x32:
+      assert(nir_op_infos[alu->op].num_inputs == 1);
+      result = emit_builtin_unop(ctx, GLSLstd450UnpackDouble2x32, get_dest_type(ctx, &alu->dest.dest, nir_type_uint), src[0]);
+      break;
+
    BUILTIN_UNOPF(nir_op_unpack_half_2x16, GLSLstd450UnpackHalf2x16)
    BUILTIN_UNOPF(nir_op_pack_64_2x32, GLSLstd450PackDouble2x32)
-   BUILTIN_UNOPF(nir_op_unpack_64_2x32, GLSLstd450UnpackDouble2x32)
 #undef BUILTIN_UNOP
 #undef BUILTIN_UNOPF
 
@@ -2120,8 +2087,6 @@ emit_alu(struct ntv_context *ctx, nir_alu_instr *alu)
    BINOP(nir_op_uge, SpvOpUGreaterThanEqual)
    BINOP(nir_op_flt, SpvOpFOrdLessThan)
    BINOP(nir_op_fge, SpvOpFOrdGreaterThanEqual)
-   BINOP(nir_op_feq, SpvOpFOrdEqual)
-   BINOP(nir_op_fneu, SpvOpFUnordNotEqual)
    BINOP(nir_op_frem, SpvOpFRem)
 #undef BINOP
 
@@ -2185,6 +2150,23 @@ emit_alu(struct ntv_context *ctx, nir_alu_instr *alu)
    case nir_op_slt:
    case nir_op_sge:
       unreachable("should already be lowered away");
+
+   case nir_op_fneu:
+      assert(nir_op_infos[alu->op].num_inputs == 2);
+      if (raw_src[0] == raw_src[1])
+         result =  emit_unop(ctx, SpvOpIsNan, dest_type, src[0]);
+      else
+         result = emit_binop(ctx, SpvOpFUnordNotEqual, dest_type, src[0], src[1]);
+      break;
+
+   case nir_op_feq:
+      assert(nir_op_infos[alu->op].num_inputs == 2);
+      if (raw_src[0] == raw_src[1])
+         result =  emit_unop(ctx, SpvOpLogicalNot, dest_type,
+                             emit_unop(ctx, SpvOpIsNan, dest_type, src[0]));
+      else
+         result = emit_binop(ctx, SpvOpFOrdEqual, dest_type, src[0], src[1]);
+      break;
 
    case nir_op_flrp:
       assert(nir_op_infos[alu->op].num_inputs == 3);

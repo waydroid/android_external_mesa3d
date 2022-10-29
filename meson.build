@@ -193,7 +193,7 @@ if gallium_drivers.contains('auto')
       ]
     elif ['arm', 'aarch64'].contains(host_machine.cpu_family())
       gallium_drivers = [
-        'v3d', 'vc4', 'freedreno', 'etnaviv', 'nouveau',
+        'v3d', 'vc4', 'freedreno', 'etnaviv', 'nouveau', 'svga',
         'tegra', 'virgl', 'lima', 'panfrost', 'swrast'
       ]
     elif ['mips', 'mips64', 'riscv32', 'riscv64'].contains(host_machine.cpu_family())
@@ -1630,7 +1630,7 @@ endif
 dep_futex = null_dep
 if host_machine.system() == 'windows'
   if (get_option('min-windows-version') < 8)
-    dep_futex = declare_dependency(compile_args : ['-DWINDOWS_NO_FUTEX'])
+    pre_args += '-DWINDOWS_NO_FUTEX'
   else
     dep_futex = cc.find_library('synchronization', required : true)
   endif
@@ -1876,7 +1876,7 @@ if with_clc
 
   dep_clang = cpp.find_library('clang-cpp', dirs : llvm_libdir, required : false)
 
-  if not dep_clang.found()
+  if not dep_clang.found() or not _shared_llvm
     clang_modules = [
       'clangBasic', 'clangAST', 'clangCodeGen', 'clangLex',
       'clangDriver', 'clangFrontend', 'clangFrontendTool',
@@ -1903,12 +1903,8 @@ with_opencl_native = _opencl != 'disabled' and get_option('opencl-native')
 if (with_amd_vk or with_gallium_radeonsi or
     (with_gallium_opencl and with_opencl_native) or
     (with_gallium_r600 and with_llvm))
-  if with_platform_windows
-    dep_elf = dependency('libelf', required : false, fallback : ['libelf', 'libelf_dep'])
-  else
-    dep_elf = dependency('libelf', required : false)
-  endif
-  if not dep_elf.found()
+  dep_elf = dependency('libelf', required : false)
+  if not with_platform_windows and not dep_elf.found()
     dep_elf = cc.find_library('elf')
   endif
 else

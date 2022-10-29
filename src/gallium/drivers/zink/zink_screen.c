@@ -683,7 +683,7 @@ zink_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
       return screen->info.props.limits.maxTexelGatherOffset;
 
    case PIPE_CAP_SAMPLER_REDUCTION_MINMAX_ARB:
-      return screen->vk_version >= VK_MAKE_VERSION(1,2,0) || screen->info.have_EXT_sampler_filter_minmax;
+      return screen->info.feats12.samplerFilterMinmax || screen->info.have_EXT_sampler_filter_minmax;
 
    case PIPE_CAP_FS_FINE_DERIVATIVE:
       return 1;
@@ -761,8 +761,8 @@ zink_get_param(struct pipe_screen *pscreen, enum pipe_cap param)
    case PIPE_CAP_MAX_SHADER_BUFFER_SIZE_UINT:
       /* 1<<27 is required by VK spec */
       assert(screen->info.props.limits.maxStorageBufferRange >= 1 << 27);
-      /* but Gallium can't handle values that are too big, so clamp to VK spec minimum */
-      return MIN2(get_smallest_buffer_heap(screen), 1 << 27);
+      /* clamp to VK spec minimum */
+      return MIN2(get_smallest_buffer_heap(screen), screen->info.props.limits.maxStorageBufferRange);
 
    case PIPE_CAP_FS_COORD_ORIGIN_UPPER_LEFT:
    case PIPE_CAP_FS_COORD_PIXEL_CENTER_HALF_INTEGER:
@@ -1265,6 +1265,8 @@ zink_destroy_screen(struct pipe_screen *pscreen)
    if (VK_NULL_HANDLE != screen->debugUtilsCallbackHandle) {
       VKSCR(DestroyDebugUtilsMessengerEXT)(screen->instance, screen->debugUtilsCallbackHandle, NULL);
    }
+
+   util_vertex_state_cache_deinit(&screen->vertex_state_cache);
 
    u_transfer_helper_destroy(pscreen->transfer_helper);
 #ifdef ENABLE_SHADER_CACHE
