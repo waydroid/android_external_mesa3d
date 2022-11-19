@@ -761,6 +761,12 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
    device->local_fd = fd;
    device->ws->query_info(device->ws, &device->rad_info);
 
+   if (device->rad_info.gfx_level >= GFX11) {
+      result = vk_errorf(instance, VK_ERROR_INCOMPATIBLE_DRIVER,
+                          "This version of RADV does not support RDNA3 yet.");
+      goto fail_wsi;
+   }
+
    device->use_llvm = instance->debug_flags & RADV_DEBUG_LLVM;
 #ifndef LLVM_AVAILABLE
    if (device->use_llvm) {
@@ -908,9 +914,7 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
 fail_perfcounters:
    ac_destroy_perfcounters(&device->ac_perfcounters);
    disk_cache_destroy(device->disk_cache);
-#ifdef ENABLE_SHADER_CACHE
 fail_wsi:
-#endif
    device->ws->destroy(device->ws);
 fail_base:
    vk_physical_device_finish(&device->vk);
@@ -3877,6 +3881,10 @@ radv_fill_shader_rings(struct radv_device *device, uint32_t *map, bool add_sampl
       } else if (device->physical_device->rad_info.gfx_level >= GFX10) {
          desc[3] |= S_008F0C_FORMAT(V_008F0C_GFX10_FORMAT_32_FLOAT) |
                     S_008F0C_OOB_SELECT(V_008F0C_OOB_SELECT_DISABLED) | S_008F0C_RESOURCE_LEVEL(1);
+      } else if (device->physical_device->rad_info.gfx_level >= GFX8) {
+         /* DATA_FORMAT is STRIDE[14:17] for MUBUF with ADD_TID_ENABLE=1 */
+         desc[3] |= S_008F0C_NUM_FORMAT(V_008F0C_BUF_NUM_FORMAT_FLOAT) |
+                    S_008F0C_DATA_FORMAT(0) | S_008F0C_ELEMENT_SIZE(1);
       } else {
          desc[3] |= S_008F0C_NUM_FORMAT(V_008F0C_BUF_NUM_FORMAT_FLOAT) |
                     S_008F0C_DATA_FORMAT(V_008F0C_BUF_DATA_FORMAT_32) | S_008F0C_ELEMENT_SIZE(1);
@@ -3949,6 +3957,10 @@ radv_fill_shader_rings(struct radv_device *device, uint32_t *map, bool add_sampl
       } else if (device->physical_device->rad_info.gfx_level >= GFX10) {
          desc[7] |= S_008F0C_FORMAT(V_008F0C_GFX10_FORMAT_32_FLOAT) |
                     S_008F0C_OOB_SELECT(V_008F0C_OOB_SELECT_DISABLED) | S_008F0C_RESOURCE_LEVEL(1);
+      } else if (device->physical_device->rad_info.gfx_level >= GFX8) {
+         /* DATA_FORMAT is STRIDE[14:17] for MUBUF with ADD_TID_ENABLE=1 */
+         desc[7] |= S_008F0C_NUM_FORMAT(V_008F0C_BUF_NUM_FORMAT_FLOAT) |
+                    S_008F0C_DATA_FORMAT(0) | S_008F0C_ELEMENT_SIZE(1);
       } else {
          desc[7] |= S_008F0C_NUM_FORMAT(V_008F0C_BUF_NUM_FORMAT_FLOAT) |
                     S_008F0C_DATA_FORMAT(V_008F0C_BUF_DATA_FORMAT_32) | S_008F0C_ELEMENT_SIZE(1);
@@ -4235,13 +4247,14 @@ radv_emit_compute_scratch(struct radv_device *device, struct radeon_cmdbuf *cs,
    radv_cs_add_buffer(device->ws, cs, compute_scratch_bo);
 
    if (info->gfx_level >= GFX11) {
-      radeon_set_sh_reg_seq(cs, R_00B840_COMPUTE_DISPATCH_SCRATCH_BASE_LO, 4);
+      radeon_set_sh_reg_seq(cs, R_00B840_COMPUTE_DISPATCH_SCRATCH_BASE_LO, 2);
       radeon_emit(cs, scratch_va >> 8);
       radeon_emit(cs, scratch_va >> 40);
-   } else {
-      radeon_set_sh_reg_seq(cs, R_00B900_COMPUTE_USER_DATA_0, 2);
+
+      waves /= info->num_se;
    }
 
+   radeon_set_sh_reg_seq(cs, R_00B900_COMPUTE_USER_DATA_0, 2);
    radeon_emit(cs, scratch_va);
    radeon_emit(cs, rsrc1);
 
