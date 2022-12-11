@@ -732,33 +732,45 @@ static void visit_alu(struct ac_nir_context *ctx, const nir_alu_instr *instr)
    case nir_op_ixor:
       result = LLVMBuildXor(ctx->ac.builder, src[0], src[1], "");
       break;
-   case nir_op_ishl:
+   case nir_op_ishl: {
       if (ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[1])) <
           ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[0])))
          src[1] = LLVMBuildZExt(ctx->ac.builder, src[1], LLVMTypeOf(src[0]), "");
       else if (ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[1])) >
                ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[0])))
          src[1] = LLVMBuildTrunc(ctx->ac.builder, src[1], LLVMTypeOf(src[0]), "");
+      LLVMTypeRef type = LLVMTypeOf(src[0]);
+      src[1] = LLVMBuildAnd(ctx->ac.builder, src[1],
+                            LLVMConstInt(type, LLVMGetIntTypeWidth(type) - 1, false), "");
       result = LLVMBuildShl(ctx->ac.builder, src[0], src[1], "");
       break;
-   case nir_op_ishr:
+   }
+   case nir_op_ishr: {
       if (ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[1])) <
           ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[0])))
          src[1] = LLVMBuildZExt(ctx->ac.builder, src[1], LLVMTypeOf(src[0]), "");
       else if (ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[1])) >
                ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[0])))
          src[1] = LLVMBuildTrunc(ctx->ac.builder, src[1], LLVMTypeOf(src[0]), "");
+      LLVMTypeRef type = LLVMTypeOf(src[0]);
+      src[1] = LLVMBuildAnd(ctx->ac.builder, src[1],
+                            LLVMConstInt(type, LLVMGetIntTypeWidth(type) - 1, false), "");
       result = LLVMBuildAShr(ctx->ac.builder, src[0], src[1], "");
       break;
-   case nir_op_ushr:
+   }
+   case nir_op_ushr: {
       if (ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[1])) <
           ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[0])))
          src[1] = LLVMBuildZExt(ctx->ac.builder, src[1], LLVMTypeOf(src[0]), "");
       else if (ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[1])) >
                ac_get_elem_bits(&ctx->ac, LLVMTypeOf(src[0])))
          src[1] = LLVMBuildTrunc(ctx->ac.builder, src[1], LLVMTypeOf(src[0]), "");
+      LLVMTypeRef type = LLVMTypeOf(src[0]);
+      src[1] = LLVMBuildAnd(ctx->ac.builder, src[1],
+                            LLVMConstInt(type, LLVMGetIntTypeWidth(type) - 1, false), "");
       result = LLVMBuildLShr(ctx->ac.builder, src[0], src[1], "");
       break;
+   }
    case nir_op_ilt:
       result = emit_int_cmp(&ctx->ac, LLVMIntSLT, src[0], src[1]);
       break;
@@ -2410,7 +2422,16 @@ static void visit_store_output(struct ac_nir_context *ctx, nir_intrinsic_instr *
           * using read-modify-write.
           */
          index = LLVMConstInt(ctx->ac.i32, nir_intrinsic_io_semantics(instr).high_16bits, 0);
+
+#if LLVM_VERSION_MAJOR <= 14
+         /* To work around old LLVM bug which won't change the output type to
+          * LLVMBuildLoad2 type argument.
+          */
+         output = LLVMBuildLoad2(ctx->ac.builder, ctx->ac.f32, output_addr, "");
+         output = LLVMBuildBitCast(ctx->ac.builder, output, ctx->ac.v2f16, "");
+#else
          output = LLVMBuildLoad2(ctx->ac.builder, ctx->ac.v2f16, output_addr, "");
+#endif
          output = LLVMBuildInsertElement(ctx->ac.builder, output, value, index, "");
          value = LLVMBuildBitCast(ctx->ac.builder, output, ctx->ac.f32, "");
       }
