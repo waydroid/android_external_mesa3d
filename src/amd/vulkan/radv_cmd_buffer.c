@@ -1341,7 +1341,9 @@ radv_emit_rbplus_state(struct radv_cmd_buffer *cmd_buffer)
              spi_format == V_028714_SPI_SHADER_UINT16_ABGR ||
              spi_format == V_028714_SPI_SHADER_SINT16_ABGR) {
             sx_ps_downconvert |= V_028754_SX_RT_EXPORT_8_8_8_8 << (i * 4);
-            sx_blend_opt_epsilon |= V_028758_8BIT_FORMAT << (i * 4);
+
+            if (G_028C70_NUMBER_TYPE(cb->cb_color_info) != V_028C70_NUMBER_SRGB)
+               sx_blend_opt_epsilon |= V_028758_8BIT_FORMAT << (i * 4);
          }
          break;
 
@@ -2946,7 +2948,7 @@ radv_emit_framebuffer_state(struct radv_cmd_buffer *cmd_buffer)
 
       if (cmd_buffer->device->physical_device->rad_info.gfx_level >= GFX11) {
          radeon_set_context_reg(cmd_buffer->cs, R_028424_CB_FDCC_CONTROL,
-                                S_028424_SAMPLE_MASK_TRACKER_WATERMARK(15));
+                                S_028424_SAMPLE_MASK_TRACKER_WATERMARK(0));
       } else {
         uint8_t watermark = gfx_level >= GFX10 ? 6 : 4;
 
@@ -5372,6 +5374,12 @@ radv_bind_vs_input_state(struct radv_cmd_buffer *cmd_buffer,
 
    cmd_buffer->state.dynamic_vs_input = *src;
 
+   if (cmd_buffer->device->physical_device->rad_info.gfx_level == GFX6 ||
+       cmd_buffer->device->physical_device->rad_info.gfx_level >= GFX10) {
+      cmd_buffer->state.vbo_misaligned_mask = 0;
+      cmd_buffer->state.vbo_misaligned_mask_invalid = src->attribute_mask;
+   }
+
    cmd_buffer->state.dirty |= RADV_CMD_DIRTY_DYNAMIC_VERTEX_INPUT;
 }
 
@@ -7508,6 +7516,12 @@ radv_get_ngg_culling_settings(struct radv_cmd_buffer *cmd_buffer, bool vp_y_inve
    const struct radv_graphics_pipeline *pipeline = cmd_buffer->state.graphics_pipeline;
    const struct radv_dynamic_state *d = &cmd_buffer->state.dynamic;
 
+   /* Disable shader culling entirely when conservative overestimate is used.
+    * The face culling algorithm can delete very tiny triangles (even if unintended).
+    */
+   if (d->conservative_rast_mode == VK_CONSERVATIVE_RASTERIZATION_MODE_OVERESTIMATE_EXT)
+      return radv_nggc_none;
+
    /* Cull every triangle when rasterizer discard is enabled. */
    if (d->rasterizer_discard_enable)
       return radv_nggc_front_face | radv_nggc_back_face;
@@ -7529,12 +7543,10 @@ radv_get_ngg_culling_settings(struct radv_cmd_buffer *cmd_buffer, bool vp_y_inve
    if (d->cull_mode & VK_CULL_MODE_BACK_BIT)
       nggc_settings |= radv_nggc_back_face;
 
-   /* Small primitive culling is only valid when conservative overestimation is not used. It's also
-    * disabled for user sample locations because small primitive culling assumes a sample
-    * position at (0.5, 0.5). */
-   bool uses_conservative_overestimate =
-      d->conservative_rast_mode == VK_CONSERVATIVE_RASTERIZATION_MODE_OVERESTIMATE_EXT;
-   if (!uses_conservative_overestimate && !pipeline->uses_user_sample_locations) {
+   /* Small primitive culling assumes a sample position at (0.5, 0.5)
+    * so don't enable it with user sample locations.
+    */
+   if (!pipeline->uses_user_sample_locations) {
       nggc_settings |= radv_nggc_small_primitives;
 
       /* small_prim_precision = num_samples / 2^subpixel_bits
