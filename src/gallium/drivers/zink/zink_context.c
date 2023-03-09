@@ -99,6 +99,9 @@ zink_context_destroy(struct pipe_context *pctx)
    struct zink_context *ctx = zink_context(pctx);
    struct zink_screen *screen = zink_screen(pctx->screen);
 
+   struct pipe_framebuffer_state fb = {0};
+   pctx->set_framebuffer_state(pctx, &fb);
+
    if (util_queue_is_initialized(&screen->flush_queue))
       util_queue_finish(&screen->flush_queue);
    if (ctx->batch.state && !screen->device_lost) {
@@ -1442,8 +1445,9 @@ zink_set_constant_buffer(struct pipe_context *pctx,
 ALWAYS_INLINE static void
 unbind_descriptor_reads(struct zink_resource *res, gl_shader_stage pstage)
 {
-   if (!res->sampler_binds[pstage] && !res->image_binds[pstage])
-      res->barrier_access[pstage == MESA_SHADER_COMPUTE] &= ~VK_ACCESS_SHADER_READ_BIT;
+   bool is_compute = pstage == MESA_SHADER_COMPUTE;
+   if (!res->sampler_bind_count[is_compute] && !res->image_bind_count[is_compute])
+      res->barrier_access[is_compute] &= ~VK_ACCESS_SHADER_READ_BIT;
 }
 
 ALWAYS_INLINE static void
@@ -1520,7 +1524,8 @@ zink_set_shader_buffers(struct pipe_context *pctx,
          else
             new_res->obj->unordered_read = false;
       } else {
-         update = !!res;
+         if (res)
+            update = true;
          ssbo->buffer_offset = 0;
          ssbo->buffer_size = 0;
          if (res) {
@@ -2894,7 +2899,8 @@ unbind_fb_surface(struct zink_context *ctx, struct pipe_surface *surf, unsigned 
       check_resource_for_batch_ref(ctx, res);
       if (res->sampler_bind_count[0]) {
          update_res_sampler_layouts(ctx, res);
-         _mesa_set_add(ctx->need_barriers[0], res);
+         if (res->layout != VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+            _mesa_set_add(ctx->need_barriers[0], res);
       }
    }
 }
@@ -3262,7 +3268,7 @@ pipeline_dst_stage(VkImageLayout layout)
 bool
 zink_resource_access_is_write(VkAccessFlags flags)
 {
-   return (flags & ALL_READ_ACCESS_FLAGS) != flags;
+   return (flags & ~ALL_READ_ACCESS_FLAGS) > 0;
 }
 
 bool
@@ -4636,6 +4642,7 @@ zink_context_replace_buffer_storage(struct pipe_context *pctx, struct pipe_resou
       zink_batch_reference_resource(&ctx->batch, d);
    /* don't be too creative */
    zink_resource_object_reference(screen, &d->obj, s->obj);
+   d->valid_buffer_range = s->valid_buffer_range;
    /* force counter buffer reset */
    d->so_valid = false;
    if (num_rebinds && rebind_buffer(ctx, d, rebind_mask, num_rebinds) < num_rebinds)
