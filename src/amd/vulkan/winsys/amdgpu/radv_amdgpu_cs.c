@@ -119,13 +119,7 @@ static bool
 ring_can_use_ib_bos(const struct radv_amdgpu_winsys *ws,
                     enum amd_ip_type ip_type)
 {
-   if (ip_type == AMD_IP_UVD ||
-       ip_type == AMD_IP_VCE ||
-       ip_type == AMD_IP_UVD_ENC ||
-       ip_type == AMD_IP_VCN_DEC ||
-       ip_type == AMD_IP_VCN_ENC)
-      return false;
-   return ws->use_ib_bos;
+   return ws->use_ib_bos && (ip_type == AMD_IP_GFX || ip_type == AMD_IP_COMPUTE);
 }
 
 struct radv_amdgpu_cs_request {
@@ -161,9 +155,9 @@ struct radv_amdgpu_cs_request {
    uint64_t seq_no;
 };
 
-static int radv_amdgpu_cs_submit(struct radv_amdgpu_ctx *ctx,
-                                 struct radv_amdgpu_cs_request *request,
-                                 struct radv_winsys_sem_info *sem_info);
+static VkResult radv_amdgpu_cs_submit(struct radv_amdgpu_ctx *ctx,
+                                      struct radv_amdgpu_cs_request *request,
+                                      struct radv_winsys_sem_info *sem_info);
 
 static void
 radv_amdgpu_request_to_fence(struct radv_amdgpu_ctx *ctx, struct radv_amdgpu_fence *fence,
@@ -240,7 +234,7 @@ radv_amdgpu_cs_create(struct radeon_winsys *ws, enum amd_ip_type ip_type)
 
    if (cs->use_ib) {
       VkResult result =
-         ws->buffer_create(ws, ib_size, 0, radv_amdgpu_cs_domain(ws),
+         ws->buffer_create(ws, ib_size, cs->ws->info.ib_alignment, radv_amdgpu_cs_domain(ws),
                            RADEON_FLAG_CPU_ACCESS | RADEON_FLAG_NO_INTERPROCESS_SHARING |
                               RADEON_FLAG_READ_ONLY | RADEON_FLAG_GTT_WC,
                            RADV_BO_PRIORITY_CS, 0, &cs->ib_buffer);
@@ -387,11 +381,11 @@ radv_amdgpu_cs_grow(struct radeon_cmdbuf *_cs, size_t min_size)
    /* max that fits in the chain size field. */
    ib_size = align(MIN2(ib_size, 0xfffff), ib_pad_dw_mask + 1);
 
-   VkResult result =
-      cs->ws->base.buffer_create(&cs->ws->base, ib_size, 0, radv_amdgpu_cs_domain(&cs->ws->base),
-                                 RADEON_FLAG_CPU_ACCESS | RADEON_FLAG_NO_INTERPROCESS_SHARING |
-                                    RADEON_FLAG_READ_ONLY | RADEON_FLAG_GTT_WC,
-                                 RADV_BO_PRIORITY_CS, 0, &cs->ib_buffer);
+   VkResult result = cs->ws->base.buffer_create(
+      &cs->ws->base, ib_size, cs->ws->info.ib_alignment, radv_amdgpu_cs_domain(&cs->ws->base),
+      RADEON_FLAG_CPU_ACCESS | RADEON_FLAG_NO_INTERPROCESS_SHARING | RADEON_FLAG_READ_ONLY |
+         RADEON_FLAG_GTT_WC,
+      RADV_BO_PRIORITY_CS, 0, &cs->ib_buffer);
 
    if (result != VK_SUCCESS) {
       cs->base.cdw = 0;
@@ -1121,10 +1115,10 @@ radv_amdgpu_winsys_cs_submit_sysmem(struct radv_amdgpu_ctx *ctx, int queue_idx,
                pad_words++;
             }
 
-            ws->buffer_create(
-               ws, 4 * size, 4096, radv_amdgpu_cs_domain(ws),
-               RADEON_FLAG_CPU_ACCESS | RADEON_FLAG_NO_INTERPROCESS_SHARING | RADEON_FLAG_READ_ONLY |
-               RADEON_FLAG_GTT_WC, RADV_BO_PRIORITY_CS, 0, &bos[j]);
+            ws->buffer_create(ws, 4 * size, cs->ws->info.ib_alignment, radv_amdgpu_cs_domain(ws),
+                              RADEON_FLAG_CPU_ACCESS | RADEON_FLAG_NO_INTERPROCESS_SHARING |
+                                 RADEON_FLAG_READ_ONLY | RADEON_FLAG_GTT_WC,
+                              RADV_BO_PRIORITY_CS, 0, &bos[j]);
             ptr = ws->buffer_map(bos[j]);
 
             if (needs_preamble) {
@@ -1165,10 +1159,10 @@ radv_amdgpu_winsys_cs_submit_sysmem(struct radv_amdgpu_ctx *ctx, int queue_idx,
          }
          assert(cnt);
 
-         ws->buffer_create(
-            ws, 4 * size, 4096, radv_amdgpu_cs_domain(ws),
-            RADEON_FLAG_CPU_ACCESS | RADEON_FLAG_NO_INTERPROCESS_SHARING | RADEON_FLAG_READ_ONLY |
-            RADEON_FLAG_GTT_WC, RADV_BO_PRIORITY_CS, 0, &bos[0]);
+         ws->buffer_create(ws, 4 * size, cs->ws->info.ib_alignment, radv_amdgpu_cs_domain(ws),
+                           RADEON_FLAG_CPU_ACCESS | RADEON_FLAG_NO_INTERPROCESS_SHARING |
+                              RADEON_FLAG_READ_ONLY | RADEON_FLAG_GTT_WC,
+                           RADV_BO_PRIORITY_CS, 0, &bos[0]);
          ptr = ws->buffer_map(bos[0]);
 
          if (preamble_cs) {

@@ -313,6 +313,9 @@ update_inline_shader_state(struct rendering_state *state, enum pipe_shader_type 
    if (constbuf_dirty) {
       struct pipe_box box = {0};
       u_foreach_bit(slot, pipeline->inlines[stage].can_inline) {
+         /* this is already inlined above */
+         if (slot == 0)
+            continue;
          unsigned count = pipeline->inlines[stage].count[slot];
          struct pipe_constant_buffer *cbuf = &state->const_buffer[sh][slot - 1];
          struct pipe_resource *pres = cbuf->buffer;
@@ -744,10 +747,13 @@ static void handle_graphics_pipeline(struct vk_cmd_queue_entry *cmd,
       if (BITSET_TEST(ps->dynamic, MESA_VK_DYNAMIC_RS_DEPTH_CLIP_ENABLE)) {
          state->depth_clamp_sets_clip = false;
       } else {
-         state->rs_state.depth_clip_near = state->rs_state.depth_clip_far =
-            vk_rasterization_state_depth_clip_enable(ps->rs);
          state->depth_clamp_sets_clip =
             ps->rs->depth_clip_enable == VK_MESA_DEPTH_CLIP_ENABLE_NOT_CLAMP;
+         if (state->depth_clamp_sets_clip)
+            state->rs_state.depth_clip_near = state->rs_state.depth_clip_far = !state->rs_state.depth_clamp;
+         else
+            state->rs_state.depth_clip_near = state->rs_state.depth_clip_far =
+               vk_rasterization_state_depth_clip_enable(ps->rs);
       }
 
       if (!BITSET_TEST(ps->dynamic, MESA_VK_DYNAMIC_RS_RASTERIZER_DISCARD_ENABLE))
@@ -2991,7 +2997,7 @@ static void handle_clear_ds_image(struct vk_cmd_queue_entry *cmd,
                                           cmd->u.clear_depth_stencil_image.depth_stencil->depth,
                                           cmd->u.clear_depth_stencil_image.depth_stencil->stencil,
                                           0, 0,
-                                          width, height, true);
+                                          width, height, false);
          state->pctx->surface_destroy(state->pctx, surf);
       }
    }

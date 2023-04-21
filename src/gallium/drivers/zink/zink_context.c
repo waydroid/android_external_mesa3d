@@ -167,6 +167,14 @@ zink_context_destroy(struct pipe_context *pctx)
       zink_destroy_render_pass(screen, he->data);
 
    zink_context_destroy_query_pools(ctx);
+   set_foreach(&ctx->gfx_inputs, he) {
+      struct zink_gfx_input_key *ikey = (void*)he->key;
+      VKSCR(DestroyPipeline)(screen->dev, ikey->pipeline, NULL);
+   }
+   set_foreach(&ctx->gfx_outputs, he) {
+      struct zink_gfx_output_key *okey = (void*)he->key;
+      VKSCR(DestroyPipeline)(screen->dev, okey->pipeline, NULL);
+   }
    u_upload_destroy(pctx->stream_uploader);
    u_upload_destroy(pctx->const_uploader);
    slab_destroy_child(&ctx->transfer_pool);
@@ -2952,6 +2960,8 @@ unbind_fb_surface(struct zink_context *ctx, struct pipe_surface *surf, unsigned 
       ctx->rp_changed = true;
    }
    res->fb_bind_count--;
+   if (!res->fb_bind_count && !res->bind_count[0])
+      _mesa_set_remove_key(ctx->need_barriers[0], res);
    unsigned feedback_loops = ctx->feedback_loops;
    if (ctx->feedback_loops & BITFIELD_BIT(idx)) {
       ctx->dynamic_fb.attachments[idx].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
