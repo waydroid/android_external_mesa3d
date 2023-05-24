@@ -58,6 +58,7 @@ struct gbm_dri_visual {
       unsigned int alpha;
    } rgba_sizes;
    bool is_float;
+   bool is_yuv;
 };
 
 struct gbm_dri_device {
