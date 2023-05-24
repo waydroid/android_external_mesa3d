@@ -522,6 +522,82 @@ static const struct gbm_dri_visual gbm_dri_visuals_table[] = {
      { 16, 16, 16, 16 },
      true,
    },
+   {
+     GBM_FORMAT_YUYV, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YVYU, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_UYVY, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_VYUY, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_AYUV, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_NV12, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_NV21, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_NV16, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_NV61, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YUV410, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YVU410, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YUV411, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YVU411, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YUV420, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YVU420, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YUV422, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YVU422, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YUV444, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
+   {
+     GBM_FORMAT_YVU444, __DRI_IMAGE_FORMAT_NONE,
+     .is_yuv = true,
+   },
 };
 
 static int

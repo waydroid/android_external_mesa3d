@@ -117,6 +117,9 @@ dri2_drm_config_is_compatible(struct dri2_egl_display *dri2_dpy,
          break;
    }
 
+   if (visual->is_yuv)
+      return false;
+
    if (i == dri2_dpy->gbm_dri->num_visuals)
       return false;
 
@@ -604,6 +607,9 @@ drm_add_configs_for_visuals(_EGLDisplay *disp)
 
       for (unsigned j = 0; j < num_visuals; j++) {
          struct dri2_egl_config *dri2_conf;
+
+         if (visuals[j].is_yuv)
+            continue;
 
          if (visuals[j].rgba_shifts.red != shifts[0] ||
              visuals[j].rgba_shifts.green != shifts[1] ||
