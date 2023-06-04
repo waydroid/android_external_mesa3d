@@ -91,6 +91,7 @@ MESON_GEN_NINJA := \
 	-Degl=enabled                                                                \
 	-Dcpp_rtti=false                                                             \
 	-Dlmsensors=disabled                                                         \
+	-Dallow-kcmp=enabled                                                         \
 
 MESON_BUILD := PATH=/usr/bin:/bin:/sbin:$$PATH ninja -C $(MESON_OUT_DIR)/build
 
