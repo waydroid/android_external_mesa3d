@@ -1537,7 +1537,7 @@ if dep_thread.found()
 endif
 
 with_expat = get_option('expat') \
-  .disable_auto_if(with_platform_android or with_platform_windows)
+  .disable_auto_if(with_platform_windows)
 
 if host_machine.system() == 'darwin'
   dep_expat = meson.get_compiler('c').find_library('expat', required : with_expat)
@@ -1553,8 +1553,8 @@ endif
 
 # We don't require expat on Android or Windows
 use_xmlconfig = get_option('xmlconfig') \
-  .require(not (with_platform_android or with_platform_windows),
-           error_message : 'xmlconfig not available on Android or Windows') \
+  .require(not (with_platform_windows),
+           error_message : 'xmlconfig not available on Windows') \
   .require(dep_expat.found(),
            error_message : 'requires expat') \
   .allowed()
