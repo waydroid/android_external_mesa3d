@@ -93,6 +93,13 @@ MESON_LLVM_VERSION := $(LLVM_VERSION_MAJOR).0.0
 LOCAL_SHARED_LIBRARIES += libLLVM$(LLVM_VERSION_MAJOR)
 endif
 
+ifneq ($(strip $(BOARD_MESA3D_GALLIUM_VA)),)
+LIBVA_MAJOR_VERSION = $(shell cat external/libva/meson.build | grep -o 'va_api_major_version = [0-9]\+' | grep -o '[0-9]*')
+LIBVA_MINOR_VERSION = $(shell cat external/libva/meson.build | grep -o 'va_api_minor_version = [0-9]\+' | grep -o '[0-9]*')
+LOCAL_SHARED_LIBRARIES += libva
+MESON_GEN_PKGCONFIGS += libva:$(LIBVA_MAJOR_VERSION).$(LIBVA_MINOR_VERSION)
+endif
+
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 30; echo $$?), 0)
 LOCAL_SHARED_LIBRARIES += \
     android.hardware.graphics.mapper@4.0 \
@@ -180,6 +187,10 @@ endif
 # Modules 'vulkan.{driver_name}', produces '/vendor/lib{64}/hw/vulkan.{driver_name}.so' HAL
 $(foreach driver,$(BOARD_MESA3D_VULKAN_DRIVERS), \
     $(eval $(call mesa3d-lib,vulkan.$(MESA_VK_LIB_SUFFIX_$(driver)),.so.0,hw,MESA3D_VULKAN_$(driver)_BIN)))
+
+ifneq ($(strip $(BOARD_MESA3D_GALLIUM_VA)),)
+$(eval $(call mesa3d-lib,libgallium_drv_video,.so.0,dri,MESA3D_GALLIUM_DRV_VIDEO_BIN))
+endif
 
 ifneq ($(filter true, $(BOARD_MESA3D_BUILD_LIBGBM)),)
 # Modules 'libgbm', produces '/vendor/lib{64}/libgbm.so'
