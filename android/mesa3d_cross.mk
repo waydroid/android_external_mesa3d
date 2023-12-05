@@ -289,10 +289,10 @@ endif
 	touch $@
 
 MESON_COPY_LIBGALLIUM := \
-	cp `ls -1 $(MESA3D_GALLIUM_DRI_DIR)/* | head -1` $($(M_TARGET_PREFIX)MESA3D_GALLIUM_DRI_BIN)
+	cp `find $(MESA3D_GALLIUM_DRI_DIR) -name \*_dri.so | head -1` $($(M_TARGET_PREFIX)MESA3D_GALLIUM_DRI_BIN)
 
 MESON_COPY_LIBGALLIUM_VIDEO := \
-       cp `ls -1 $(MESA3D_GALLIUM_DRI_DIR)/* | head -2 | tail -1` $($(M_TARGET_PREFIX)MESA3D_GALLIUM_DRV_VIDEO_BIN)
+    cp `find $(MESA3D_GALLIUM_DRI_DIR) -name \*_drv_video.so | head -1` $($(M_TARGET_PREFIX)MESA3D_GALLIUM_DRV_VIDEO_BIN)
 
 $(MESON_OUT_DIR)/install/.install.timestamp: MESON_COPY_LIBGALLIUM:=$(MESON_COPY_LIBGALLIUM)
 $(MESON_OUT_DIR)/install/.install.timestamp: MESON_BUILD:=$(MESON_BUILD)
