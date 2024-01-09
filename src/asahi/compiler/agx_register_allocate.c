@@ -4,6 +4,7 @@
  */
 
 #include "util/u_dynarray.h"
+#include "util/u_qsort.h"
 #include "agx_builder.h"
 #include "agx_compiler.h"
 #include "agx_debug.h"

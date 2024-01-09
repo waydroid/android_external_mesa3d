@@ -77,7 +77,7 @@ static const driOptionDescription anv_dri_options[] = {
       DRI_CONF_VK_X11_STRICT_IMAGE_COUNT(false)
       DRI_CONF_VK_KHR_PRESENT_WAIT(false)
       DRI_CONF_VK_XWAYLAND_WAIT_READY(true)
-      DRI_CONF_ANV_ASSUME_FULL_SUBGROUPS(false)
+      DRI_CONF_ANV_ASSUME_FULL_SUBGROUPS(0)
       DRI_CONF_ANV_DISABLE_FCV(false)
       DRI_CONF_ANV_SAMPLE_MASK_OUT_OPENGL_BEHAVIOUR(false)
       DRI_CONF_ANV_FP64_WORKAROUND_ENABLED(false)
@@ -880,11 +880,6 @@ anv_compute_sys_heap_size(struct anv_physical_device *device,
    else
       available_ram = total_ram * 3 / 4;
 
-   /* We also want to leave some padding for things we allocate in the driver,
-    * so don't go over 3/4 of the GTT either.
-    */
-   available_ram = MIN2(available_ram, device->gtt_size * 3 / 4);
-
    return available_ram;
 }
 
@@ -1585,7 +1580,7 @@ anv_init_dri_options(struct anv_instance *instance)
                        instance->vk.app_info.engine_version);
 
     instance->assume_full_subgroups =
-            driQueryOptionb(&instance->dri_options, "anv_assume_full_subgroups");
+            driQueryOptioni(&instance->dri_options, "anv_assume_full_subgroups");
     instance->limit_trig_input_range =
             driQueryOptionb(&instance->dri_options, "limit_trig_input_range");
     instance->sample_mask_out_opengl_behaviour =
@@ -2765,7 +2760,7 @@ anv_get_memory_budget(VkPhysicalDevice physicalDevice,
          }
       } else {
          total_heaps_size = total_sys_heaps_size;
-         mem_available = device->sys.available;
+         mem_available = MIN2(device->sys.available, total_heaps_size);
       }
 
       double heap_proportion = (double) heap_size / total_heaps_size;
