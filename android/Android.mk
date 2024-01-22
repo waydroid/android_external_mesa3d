@@ -94,8 +94,8 @@ LOCAL_SHARED_LIBRARIES += libLLVM$(LLVM_VERSION_MAJOR)
 endif
 
 ifneq ($(strip $(BOARD_MESA3D_GALLIUM_VA)),)
-LIBVA_MAJOR_VERSION = $(shell cat external/libva/meson.build | grep -o 'va_api_major_version = [0-9]\+' | grep -o '[0-9]*')
-LIBVA_MINOR_VERSION = $(shell cat external/libva/meson.build | grep -o 'va_api_minor_version = [0-9]\+' | grep -o '[0-9]*')
+LIBVA_MAJOR_VERSION = $(shell cat hardware/intel/common/libva/meson.build | grep -o 'va_api_major_version = [0-9]\+' | grep -o '[0-9]*')
+LIBVA_MINOR_VERSION = $(shell cat hardware/intel/common/libva/meson.build | grep -o 'va_api_minor_version = [0-9]\+' | grep -o '[0-9]*')
 LOCAL_SHARED_LIBRARIES += libva
 MESON_GEN_PKGCONFIGS += libva:$(LIBVA_MAJOR_VERSION).$(LIBVA_MINOR_VERSION)
 endif
