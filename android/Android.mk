@@ -53,7 +53,7 @@ LOCAL_CFLAGS += $(BOARD_MESA3D_CFLAGS)
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -lt 35; echo $$?), 0)
 # Before SDK35 the c++ filesystem API was part of a standalone library
-LOCAL_SHARED_LIBRARIES += libc++fs
+LOCAL_STATIC_LIBRARIES += libc++fs
 endif
 
 ifneq ($(filter swrast,$(BOARD_MESA3D_GALLIUM_DRIVERS) $(BOARD_MESA3D_VULKAN_DRIVERS)),)

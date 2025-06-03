@@ -753,7 +753,7 @@
 
 #define DRI_CONF_RADV_DISABLE_DCC_STORES(def) \
    DRI_CONF_OPT_B(radv_disable_dcc_stores, def, \
-                  "Disable DCC for color storage images")
+                  "Disable DCC for color storage images on GFX10-GFX11.5")
 
 #define DRI_CONF_RADV_LOWER_TERMINATE_TO_DISCARD(def) \
    DRI_CONF_OPT_B(radv_lower_terminate_to_discard, def, \
@@ -837,6 +837,9 @@
    DRI_CONF_OPT_B(radv_enable_float16_gfx8, def, \
                   "Expose float16 on GFX8, where it's supported but usually not beneficial.")
 
+#define DRI_CONF_RADV_FORCE_64K_SPARSE_ALIGNMENT(def) \
+   DRI_CONF_OPT_B(radv_force_64k_sparse_alignment, def, \
+                  "Force the alignment of sparse buffers to 64KiB")
 /**
  * \brief ANV specific configuration options
  */

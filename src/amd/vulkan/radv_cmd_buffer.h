@@ -77,7 +77,9 @@ enum radv_dynamic_state_bits {
    RADV_DYNAMIC_COLOR_ATTACHMENT_MAP = 1ull << 51,
    RADV_DYNAMIC_INPUT_ATTACHMENT_MAP = 1ull << 52,
    RADV_DYNAMIC_DEPTH_CLAMP_RANGE = 1ull << 53,
-   RADV_DYNAMIC_ALL = (1ull << 54) - 1,
+   RADV_DYNAMIC_VIEWPORT_WITH_COUNT = 1ull << 54,
+   RADV_DYNAMIC_SCISSOR_WITH_COUNT = 1ull << 55,
+   RADV_DYNAMIC_ALL = (1ull << 56) - 1,
 };
 
 enum radv_cmd_dirty_bits {
@@ -389,6 +391,10 @@ struct radv_cmd_state {
    uint64_t index_va;
    int32_t last_index_type;
 
+   /* Primitive restart */
+   int32_t last_primitive_restart_en;
+   uint32_t last_primitive_reset_index;
+
    enum radv_cmd_flush_bits flush_bits;
    unsigned active_occlusion_queries;
    bool perfect_occlusion_queries_enabled;
@@ -419,7 +425,8 @@ struct radv_cmd_state {
    /* Conditional rendering info. */
    uint8_t predication_op; /* 32-bit or 64-bit predicate value */
    int predication_type;   /* -1: disabled, 0: normal, 1: inverted */
-   uint64_t predication_va;
+   uint64_t user_predication_va;     /* User predication VA. */
+   uint64_t emulated_predication_va; /* Emulated VA if no 32-bit predication support. */
    uint64_t mec_inv_pred_va;  /* For inverted predication when using MEC. */
    bool mec_inv_pred_emitted; /* To ensure we don't have to repeat inverting the VA. */
    bool saved_user_cond_render;

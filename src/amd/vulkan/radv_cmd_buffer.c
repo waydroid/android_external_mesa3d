@@ -74,11 +74,6 @@ radv_bind_dynamic_state(struct radv_cmd_buffer *cmd_buffer, const struct radv_dy
    dest->sample_location.count = src->sample_location.count;
 
    if (copy_mask & RADV_DYNAMIC_VIEWPORT) {
-      if (dest->vk.vp.viewport_count != src->vk.vp.viewport_count) {
-         dest->vk.vp.viewport_count = src->vk.vp.viewport_count;
-         dest_mask |= RADV_DYNAMIC_VIEWPORT;
-      }
-
       if (memcmp(&dest->vk.vp.viewports, &src->vk.vp.viewports, src->vk.vp.viewport_count * sizeof(VkViewport))) {
          typed_memcpy(dest->vk.vp.viewports, src->vk.vp.viewports, src->vk.vp.viewport_count);
          typed_memcpy(dest->hw_vp.xform, src->hw_vp.xform, src->vk.vp.viewport_count);
@@ -86,14 +81,23 @@ radv_bind_dynamic_state(struct radv_cmd_buffer *cmd_buffer, const struct radv_dy
       }
    }
 
-   if (copy_mask & RADV_DYNAMIC_SCISSOR) {
-      if (dest->vk.vp.scissor_count != src->vk.vp.scissor_count) {
-         dest->vk.vp.scissor_count = src->vk.vp.scissor_count;
-         dest_mask |= RADV_DYNAMIC_SCISSOR;
+   if (copy_mask & RADV_DYNAMIC_VIEWPORT_WITH_COUNT) {
+      if (dest->vk.vp.viewport_count != src->vk.vp.viewport_count) {
+         dest->vk.vp.viewport_count = src->vk.vp.viewport_count;
+         dest_mask |= RADV_DYNAMIC_VIEWPORT;
       }
+   }
 
+   if (copy_mask & RADV_DYNAMIC_SCISSOR) {
       if (memcmp(&dest->vk.vp.scissors, &src->vk.vp.scissors, src->vk.vp.scissor_count * sizeof(VkRect2D))) {
          typed_memcpy(dest->vk.vp.scissors, src->vk.vp.scissors, src->vk.vp.scissor_count);
+         dest_mask |= RADV_DYNAMIC_SCISSOR;
+      }
+   }
+
+   if (copy_mask & RADV_DYNAMIC_SCISSOR_WITH_COUNT) {
+      if (dest->vk.vp.scissor_count != src->vk.vp.scissor_count) {
+         dest->vk.vp.scissor_count = src->vk.vp.scissor_count;
          dest_mask |= RADV_DYNAMIC_SCISSOR;
       }
    }
@@ -3447,48 +3451,6 @@ radv_get_primitive_reset_index(const struct radv_cmd_buffer *cmd_buffer)
 }
 
 static void
-radv_emit_primitive_restart_enable(struct radv_cmd_buffer *cmd_buffer)
-{
-   struct radv_device *device = radv_cmd_buffer_device(cmd_buffer);
-   const struct radv_physical_device *pdev = radv_device_physical(device);
-   const enum amd_gfx_level gfx_level = pdev->info.gfx_level;
-   const struct radv_dynamic_state *const d = &cmd_buffer->state.dynamic;
-   struct radeon_cmdbuf *cs = cmd_buffer->cs;
-   const bool en = d->vk.ia.primitive_restart_enable;
-
-   radeon_begin(cs);
-
-   if (pdev->info.has_prim_restart_sync_bug) {
-      radeon_event_write(V_028A90_SQ_NON_EVENT);
-   }
-
-   if (gfx_level >= GFX11) {
-      radeon_set_uconfig_reg(R_03092C_GE_MULTI_PRIM_IB_RESET_EN, S_03092C_RESET_EN(en) |
-                                                                    /* This disables primitive restart for non-indexed
-                                                                     * draws. By keeping this set, we don't have to
-                                                                     * unset RESET_EN for non-indexed draws. */
-                                                                    S_03092C_DISABLE_FOR_AUTO_INDEX(1));
-   } else if (gfx_level >= GFX9) {
-      radeon_set_uconfig_reg(R_03092C_VGT_MULTI_PRIM_IB_RESET_EN, en);
-   } else {
-      radeon_set_context_reg(R_028A94_VGT_MULTI_PRIM_IB_RESET_EN, en);
-
-      /* GFX6-7: All 32 bits are compared.
-       * GFX8: Only index type bits are compared.
-       * GFX9+: Default is same as GFX8, MATCH_ALL_BITS=1 selects GFX6-7 behavior
-       */
-      if (en && gfx_level <= GFX7) {
-         const uint32_t primitive_reset_index = radv_get_primitive_reset_index(cmd_buffer);
-
-         radeon_opt_set_context_reg(cmd_buffer, R_02840C_VGT_MULTI_PRIM_IB_RESET_INDX,
-                                    RADV_TRACKED_VGT_MULTI_PRIM_IB_RESET_INDX, primitive_reset_index);
-      }
-   }
-
-   radeon_end();
-}
-
-static void
 radv_emit_logic_op(struct radv_cmd_buffer *cmd_buffer)
 {
    struct radv_device *device = radv_cmd_buffer_device(cmd_buffer);
@@ -5531,9 +5493,6 @@ radv_cmd_buffer_flush_dynamic_state(struct radv_cmd_buffer *cmd_buffer, const ui
    if (states & RADV_DYNAMIC_FRAGMENT_SHADING_RATE)
       radv_emit_fragment_shading_rate(cmd_buffer);
 
-   if (states & RADV_DYNAMIC_PRIMITIVE_RESTART_ENABLE)
-      radv_emit_primitive_restart_enable(cmd_buffer);
-
    if (states & (RADV_DYNAMIC_LOGIC_OP | RADV_DYNAMIC_LOGIC_OP_ENABLE | RADV_DYNAMIC_COLOR_WRITE_MASK |
                  RADV_DYNAMIC_COLOR_BLEND_EQUATION))
       radv_emit_logic_op(cmd_buffer);
@@ -6426,10 +6385,54 @@ gfx10_emit_ge_cntl(struct radv_cmd_buffer *cmd_buffer)
 }
 
 static void
+radv_emit_primitive_restart(struct radv_cmd_buffer *cmd_buffer, bool enable)
+{
+   struct radv_device *device = radv_cmd_buffer_device(cmd_buffer);
+   const struct radv_physical_device *pdev = radv_device_physical(device);
+   const enum amd_gfx_level gfx_level = pdev->info.gfx_level;
+   struct radeon_cmdbuf *cs = cmd_buffer->cs;
+
+   radeon_begin(cs);
+
+   if (pdev->info.has_prim_restart_sync_bug) {
+      radeon_event_write(V_028A90_SQ_NON_EVENT);
+   }
+
+   if (gfx_level >= GFX11) {
+      radeon_set_uconfig_reg(R_03092C_GE_MULTI_PRIM_IB_RESET_EN, S_03092C_RESET_EN(enable) |
+                                                                    /* This disables primitive restart for non-indexed
+                                                                     * draws. By keeping this set, we don't have to
+                                                                     * unset RESET_EN for non-indexed draws. */
+                                                                    S_03092C_DISABLE_FOR_AUTO_INDEX(1));
+   } else if (gfx_level >= GFX9) {
+      radeon_set_uconfig_reg(R_03092C_VGT_MULTI_PRIM_IB_RESET_EN, enable);
+   } else {
+      radeon_set_context_reg(R_028A94_VGT_MULTI_PRIM_IB_RESET_EN, enable);
+
+      /* GFX6-7: All 32 bits are compared.
+       * GFX8: Only index type bits are compared.
+       * GFX9+: Default is same as GFX8, MATCH_ALL_BITS=1 selects GFX6-7 behavior
+       */
+      if (enable && gfx_level <= GFX7) {
+         const uint32_t primitive_reset_index = radv_get_primitive_reset_index(cmd_buffer);
+
+         radeon_opt_set_context_reg(cmd_buffer, R_02840C_VGT_MULTI_PRIM_IB_RESET_INDX,
+                                    RADV_TRACKED_VGT_MULTI_PRIM_IB_RESET_INDX, primitive_reset_index);
+      }
+   }
+
+   radeon_end();
+}
+
+static void
 radv_emit_draw_registers(struct radv_cmd_buffer *cmd_buffer, const struct radv_draw_info *draw_info)
 {
    struct radv_device *device = radv_cmd_buffer_device(cmd_buffer);
    const struct radv_physical_device *pdev = radv_device_physical(device);
+   const struct radv_dynamic_state *d = &cmd_buffer->state.dynamic;
+   const bool primitive_restart_en =
+      (draw_info->indexed || pdev->info.gfx_level >= GFX11) && d->vk.ia.primitive_restart_enable;
+   const uint32_t primitive_reset_index = radv_get_primitive_reset_index(cmd_buffer);
    const struct radeon_info *gpu_info = &pdev->info;
    struct radv_cmd_state *state = &cmd_buffer->state;
    struct radeon_cmdbuf *cs = cmd_buffer->cs;
@@ -6473,6 +6476,13 @@ radv_emit_draw_registers(struct radv_cmd_buffer *cmd_buffer, const struct radv_d
       radeon_end();
 
       state->last_index_type = index_type;
+   }
+
+   if (primitive_restart_en != state->last_primitive_restart_en ||
+       (pdev->info.gfx_level <= GFX7 && primitive_reset_index != state->last_primitive_reset_index)) {
+      radv_emit_primitive_restart(cmd_buffer, primitive_restart_en);
+      state->last_primitive_restart_en = primitive_restart_en;
+      state->last_primitive_reset_index = primitive_reset_index;
    }
 }
 
@@ -6655,10 +6665,11 @@ radv_dst_access_flush(struct radv_cmd_buffer *cmd_buffer, VkPipelineStageFlags2 
     * in the L2 cache in CB/DB mode then they are already usable from all the other L2 clients. */
    image_is_coherent |= can_skip_buffer_l2_flushes(device) && !cmd_buffer->state.rb_noncoherent_dirty;
 
-   if (dst_flags & VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT) {
+   if (dst_flags & (VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT | VK_ACCESS_2_CONDITIONAL_RENDERING_READ_BIT_EXT)) {
       /* SMEM loads are used to read compute dispatch size in shaders */
-      if (!device->load_grid_size_from_user_sgpr)
+      if ((dst_flags & VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT) && !device->load_grid_size_from_user_sgpr) {
          flush_bits |= RADV_CMD_FLAG_INV_SCACHE;
+      }
 
       /* Ensure the DGC meta shader can read the commands. */
       if (device->vk.enabled_features.deviceGeneratedCommands) {
@@ -6849,6 +6860,7 @@ radv_BeginCommandBuffer(VkCommandBuffer commandBuffer, const VkCommandBufferBegi
 
    memset(&cmd_buffer->state, 0, sizeof(cmd_buffer->state));
    cmd_buffer->state.last_index_type = -1;
+   cmd_buffer->state.last_primitive_restart_en = pdev->info.gfx_level >= GFX11 ? false : -1;
    cmd_buffer->state.last_num_instances = -1;
    cmd_buffer->state.last_vertex_offset_valid = false;
    cmd_buffer->state.last_first_instance = -1;
@@ -7083,10 +7095,6 @@ radv_CmdBindIndexBuffer2(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDevic
    }
 
    cmd_buffer->state.dirty |= RADV_CMD_DIRTY_INDEX_BUFFER;
-
-   /* Primitive restart state depends on the index type. */
-   if (cmd_buffer->state.dynamic.vk.ia.primitive_restart_enable)
-      cmd_buffer->state.dirty_dynamic |= RADV_DYNAMIC_PRIMITIVE_RESTART_ENABLE;
 }
 
 static void
@@ -7989,9 +7997,6 @@ radv_CmdSetViewport(VkCommandBuffer commandBuffer, uint32_t firstViewport, uint3
    assert(firstViewport < MAX_VIEWPORTS);
    assert(total_count >= 1 && total_count <= MAX_VIEWPORTS);
 
-   if (state->dynamic.vk.vp.viewport_count < total_count)
-      state->dynamic.vk.vp.viewport_count = total_count;
-
    memcpy(state->dynamic.vk.vp.viewports + firstViewport, pViewports, viewportCount * sizeof(*pViewports));
    for (unsigned i = 0; i < viewportCount; i++) {
       radv_get_viewport_xform(&pViewports[i], state->dynamic.hw_vp.xform[i + firstViewport].scale,
@@ -8012,9 +8017,6 @@ radv_CmdSetScissor(VkCommandBuffer commandBuffer, uint32_t firstScissor, uint32_
 
    assert(firstScissor < MAX_SCISSORS);
    assert(total_count >= 1 && total_count <= MAX_SCISSORS);
-
-   if (state->dynamic.vk.vp.scissor_count < total_count)
-      state->dynamic.vk.vp.scissor_count = total_count;
 
    memcpy(state->dynamic.vk.vp.scissors + firstScissor, pScissors, scissorCount * sizeof(*pScissors));
 
@@ -8193,12 +8195,22 @@ radv_CmdSetPrimitiveTopology(VkCommandBuffer commandBuffer, VkPrimitiveTopology 
 VKAPI_ATTR void VKAPI_CALL
 radv_CmdSetViewportWithCount(VkCommandBuffer commandBuffer, uint32_t viewportCount, const VkViewport *pViewports)
 {
+   VK_FROM_HANDLE(radv_cmd_buffer, cmd_buffer, commandBuffer);
+   struct radv_cmd_state *state = &cmd_buffer->state;
+
+   state->dynamic.vk.vp.viewport_count = viewportCount;
+
    radv_CmdSetViewport(commandBuffer, 0, viewportCount, pViewports);
 }
 
 VKAPI_ATTR void VKAPI_CALL
 radv_CmdSetScissorWithCount(VkCommandBuffer commandBuffer, uint32_t scissorCount, const VkRect2D *pScissors)
 {
+   VK_FROM_HANDLE(radv_cmd_buffer, cmd_buffer, commandBuffer);
+   struct radv_cmd_state *state = &cmd_buffer->state;
+
+   state->dynamic.vk.vp.scissor_count = scissorCount;
+
    radv_CmdSetScissor(commandBuffer, 0, scissorCount, pScissors);
 }
 
@@ -9067,6 +9079,14 @@ radv_CmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCou
          primary->state.last_index_type = secondary->state.last_index_type;
       }
 
+      if (secondary->state.last_primitive_restart_en != -1) {
+         primary->state.last_primitive_restart_en = secondary->state.last_primitive_restart_en;
+      }
+
+      if (secondary->state.last_primitive_reset_index) {
+         primary->state.last_primitive_reset_index = secondary->state.last_primitive_reset_index;
+      }
+
       primary->state.last_vrs_rates = secondary->state.last_vrs_rates;
       primary->state.last_force_vrs_rates_offset = secondary->state.last_force_vrs_rates_offset;
 
@@ -9503,7 +9523,7 @@ radv_cs_emit_compute_predication(const struct radv_device *device, struct radv_c
    if (!state->predicating)
       return;
 
-   uint64_t va = state->predication_va;
+   uint64_t va = state->user_predication_va;
 
    if (!state->predication_type) {
       /* Invert the condition the first time it is needed. */
@@ -10275,24 +10295,28 @@ radv_get_needed_dynamic_states(struct radv_cmd_buffer *cmd_buffer)
 {
    struct radv_device *device = radv_cmd_buffer_device(cmd_buffer);
    const struct radv_physical_device *pdev = radv_device_physical(device);
-   uint64_t dynamic_states = RADV_DYNAMIC_ALL;
+   uint64_t dynamic_states;
 
-   if (cmd_buffer->state.graphics_pipeline)
-      return cmd_buffer->state.graphics_pipeline->needed_dynamic_state;
-
-   /* Clear unnecessary dynamic states for shader objects. */
-   if (!cmd_buffer->state.shaders[MESA_SHADER_TESS_CTRL])
-      dynamic_states &= ~(RADV_DYNAMIC_PATCH_CONTROL_POINTS | RADV_DYNAMIC_TESS_DOMAIN_ORIGIN);
-
-   if (pdev->info.gfx_level >= GFX10_3) {
-      if (cmd_buffer->state.shaders[MESA_SHADER_MESH])
-         dynamic_states &= ~(RADV_DYNAMIC_VERTEX_INPUT | RADV_DYNAMIC_VERTEX_INPUT_BINDING_STRIDE |
-                             RADV_DYNAMIC_PRIMITIVE_RESTART_ENABLE | RADV_DYNAMIC_PRIMITIVE_TOPOLOGY);
+   if (cmd_buffer->state.graphics_pipeline) {
+      dynamic_states = cmd_buffer->state.graphics_pipeline->needed_dynamic_state;
    } else {
-      dynamic_states &= ~RADV_DYNAMIC_FRAGMENT_SHADING_RATE;
+      dynamic_states = RADV_DYNAMIC_ALL;
+
+      /* Clear unnecessary dynamic states for shader objects. */
+      if (!cmd_buffer->state.shaders[MESA_SHADER_TESS_CTRL])
+         dynamic_states &= ~(RADV_DYNAMIC_PATCH_CONTROL_POINTS | RADV_DYNAMIC_TESS_DOMAIN_ORIGIN);
+
+      if (pdev->info.gfx_level >= GFX10_3) {
+         if (cmd_buffer->state.shaders[MESA_SHADER_MESH])
+            dynamic_states &= ~(RADV_DYNAMIC_VERTEX_INPUT | RADV_DYNAMIC_VERTEX_INPUT_BINDING_STRIDE |
+                                RADV_DYNAMIC_PRIMITIVE_TOPOLOGY);
+      } else {
+         dynamic_states &= ~RADV_DYNAMIC_FRAGMENT_SHADING_RATE;
+      }
    }
 
-   return dynamic_states;
+   /* Primitive restart enable is emitted as part of the draw registers. */
+   return dynamic_states & ~RADV_DYNAMIC_PRIMITIVE_RESTART_ENABLE;
 }
 
 /*
@@ -12701,6 +12725,8 @@ radv_trace_rays(struct radv_cmd_buffer *cmd_buffer, VkTraceRaysIndirectCommand2K
    if (instance->debug_flags & RADV_DEBUG_NO_RT)
       return;
 
+   radv_suspend_conditional_rendering(cmd_buffer);
+
    if (unlikely(device->rra_trace.ray_history_buffer))
       radv_trace_trace_rays(cmd_buffer, tables, indirect_va);
 
@@ -12783,6 +12809,8 @@ radv_trace_rays(struct radv_cmd_buffer *cmd_buffer, VkTraceRaysIndirectCommand2K
 
       radv_dispatch(cmd_buffer, &info, pipeline, rt_prolog, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR);
    }
+
+   radv_resume_conditional_rendering(cmd_buffer);
 }
 
 VKAPI_ATTR void VKAPI_CALL
@@ -13577,12 +13605,15 @@ radv_begin_conditional_rendering(struct radv_cmd_buffer *cmd_buffer, uint64_t va
    const struct radv_physical_device *pdev = radv_device_physical(device);
    struct radeon_cmdbuf *cs = cmd_buffer->cs;
    unsigned pred_op = PREDICATION_OP_BOOL32;
+   uint64_t emulated_va = 0;
 
    radv_emit_cache_flush(cmd_buffer);
 
    if (cmd_buffer->qf == RADV_QUEUE_GENERAL) {
-      if (!pdev->info.has_32bit_predication) {
-         uint64_t pred_value = 0, pred_va;
+      if (pdev->info.has_32bit_predication) {
+         radv_emit_set_predication_state(cmd_buffer, draw_visible, pred_op, va);
+      } else {
+         uint64_t pred_value = 0;
          unsigned pred_offset;
 
          /* From the Vulkan spec 1.1.107:
@@ -13613,7 +13644,7 @@ radv_begin_conditional_rendering(struct radv_cmd_buffer *cmd_buffer, uint64_t va
           */
          radv_cmd_buffer_upload_data(cmd_buffer, 8, &pred_value, &pred_offset);
 
-         pred_va = radv_buffer_get_va(cmd_buffer->upload.upload_bo) + pred_offset;
+         emulated_va = radv_buffer_get_va(cmd_buffer->upload.upload_bo) + pred_offset;
 
          radeon_check_space(device->ws, cmd_buffer->cs, 8);
          radeon_begin(cs);
@@ -13623,18 +13654,17 @@ radv_begin_conditional_rendering(struct radv_cmd_buffer *cmd_buffer, uint64_t va
                      COPY_DATA_WR_CONFIRM);
          radeon_emit(va);
          radeon_emit(va >> 32);
-         radeon_emit(pred_va);
-         radeon_emit(pred_va >> 32);
+         radeon_emit(emulated_va);
+         radeon_emit(emulated_va >> 32);
 
          radeon_emit(PKT3(PKT3_PFP_SYNC_ME, 0, 0));
          radeon_emit(0);
          radeon_end();
 
-         va = pred_va;
          pred_op = PREDICATION_OP_BOOL64;
-      }
 
-      radv_emit_set_predication_state(cmd_buffer, draw_visible, pred_op, va);
+         radv_emit_set_predication_state(cmd_buffer, draw_visible, pred_op, emulated_va);
+      }
    } else {
       /* Compute queue doesn't support predication and it's emulated elsewhere. */
    }
@@ -13643,7 +13673,8 @@ radv_begin_conditional_rendering(struct radv_cmd_buffer *cmd_buffer, uint64_t va
    cmd_buffer->state.predicating = true;
    cmd_buffer->state.predication_type = draw_visible;
    cmd_buffer->state.predication_op = pred_op;
-   cmd_buffer->state.predication_va = va;
+   cmd_buffer->state.user_predication_va = va;
+   cmd_buffer->state.emulated_predication_va = emulated_va;
    cmd_buffer->state.mec_inv_pred_emitted = false;
 }
 
@@ -13660,7 +13691,8 @@ radv_end_conditional_rendering(struct radv_cmd_buffer *cmd_buffer)
    cmd_buffer->state.predicating = false;
    cmd_buffer->state.predication_type = -1;
    cmd_buffer->state.predication_op = 0;
-   cmd_buffer->state.predication_va = 0;
+   cmd_buffer->state.user_predication_va = 0;
+   cmd_buffer->state.emulated_predication_va = 0;
    cmd_buffer->state.mec_inv_pred_emitted = false;
 }
 
