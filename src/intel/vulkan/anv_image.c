@@ -481,7 +481,8 @@ anv_formats_ccs_e_compatible(const struct anv_physical_device *physical_device,
 
    if ((vk_usage & VK_IMAGE_USAGE_STORAGE_BIT) &&
        vk_tiling != VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT) {
-      assert(vk_format_aspects(vk_format) == VK_IMAGE_ASPECT_COLOR_BIT);
+      /* Only color */
+      assert((vk_format_aspects(vk_format) & ~VK_IMAGE_ASPECT_ANY_COLOR_BIT_ANV) == 0);
       if (devinfo->ver == 12) {
          /* From the TGL Bspec 44930 (r47128):
           *
@@ -1465,14 +1466,6 @@ alloc_private_binding(struct anv_device *device,
 
    if (binding->memory_range.size == 0)
       return VK_SUCCESS;
-
-   const VkImageSwapchainCreateInfoKHR *swapchain_info =
-      vk_find_struct_const(create_info->pNext, IMAGE_SWAPCHAIN_CREATE_INFO_KHR);
-
-   if (swapchain_info && swapchain_info->swapchain != VK_NULL_HANDLE) {
-      /* The image will be bound to swapchain memory. */
-      return VK_SUCCESS;
-   }
 
    VkResult result = anv_device_alloc_bo(device, "image-binding-private",
                                          binding->memory_range.size, 0, 0,
@@ -2693,6 +2686,21 @@ anv_bind_image_memory(struct anv_device *device,
          assert(image->vk.aspects == swapchain_image->vk.aspects);
          assert(mem == NULL);
 
+         /* Remove the internally allocated private binding since we're going
+          * to replace everything with BOs from the WSI image, we don't want
+          * to leak the current BO.
+          */
+         struct anv_bo *private_bo =
+            image->bindings[ANV_IMAGE_MEMORY_BINDING_PRIVATE].address.bo;
+         if (private_bo) {
+            assert(image->bindings[ANV_IMAGE_MEMORY_BINDING_PRIVATE].memory_range.size);
+            assert(!image->bindings[ANV_IMAGE_MEMORY_BINDING_PRIVATE].host_map);
+
+            ANV_DMR_BO_FREE(&image->vk.base, private_bo);
+            anv_device_release_bo(device, private_bo);
+            image->bindings[ANV_IMAGE_MEMORY_BINDING_PRIVATE].address.bo = NULL;
+         }
+
          for (int j = 0; j < ARRAY_SIZE(image->bindings); ++j) {
             assert(memory_ranges_equal(image->bindings[j].memory_range,
                                        swapchain_image->bindings[j].memory_range));
@@ -2705,8 +2713,7 @@ anv_bind_image_memory(struct anv_device *device,
          /* We must bump the private binding's bo's refcount because, unlike the other
           * bindings, its lifetime is not application-managed.
           */
-         struct anv_bo *private_bo =
-            image->bindings[ANV_IMAGE_MEMORY_BINDING_PRIVATE].address.bo;
+         private_bo = image->bindings[ANV_IMAGE_MEMORY_BINDING_PRIVATE].address.bo;
          if (private_bo)
             anv_bo_ref(private_bo);
 
@@ -3457,6 +3464,7 @@ anv_layout_to_fast_clear_type(const struct intel_device_info * const devinfo,
 bool
 anv_can_fast_clear_color(const struct anv_cmd_buffer *cmd_buffer,
                          const struct anv_image *image,
+                         VkImageAspectFlags clear_aspect,
                          unsigned level,
                          const struct VkClearRect *clear_rect,
                          VkImageLayout layout,
@@ -3476,7 +3484,7 @@ anv_can_fast_clear_color(const struct anv_cmd_buffer *cmd_buffer,
     */
    enum anv_fast_clear_type fast_clear_type =
       anv_layout_to_fast_clear_type(cmd_buffer->device->info, image,
-                                    VK_IMAGE_ASPECT_COLOR_BIT, layout,
+                                    clear_aspect, layout,
                                     cmd_buffer->queue_family->queueFlags);
    switch (fast_clear_type) {
    case ANV_FAST_CLEAR_NONE:
