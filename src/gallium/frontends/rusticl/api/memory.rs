@@ -3022,12 +3022,9 @@ unsafe impl CLInfo<cl_gl_texture_info> for cl_mem {
         let mem = MemBase::ref_from_raw(*self)?;
         match *q {
             CL_GL_MIPMAP_LEVEL => v.write::<cl_GLint>(0),
-            CL_GL_TEXTURE_TARGET => v.write::<cl_GLenum>(
-                mem.gl_obj
-                    .as_ref()
-                    .ok_or(CL_INVALID_GL_OBJECT)?
-                    .gl_object_target,
-            ),
+            CL_GL_TEXTURE_TARGET => {
+                v.write::<cl_GLenum>(mem.gl_obj.as_ref().ok_or(CL_INVALID_GL_OBJECT)?.target())
+            }
             _ => Err(CL_INVALID_VALUE),
         }
     }
@@ -3063,7 +3060,7 @@ fn create_from_gl(
         let gl_export_manager =
             gl_ctx_manager.export_object(&c, target, flags as u32, miplevel, texture)?;
 
-        Ok(MemBase::from_gl(c, flags, &gl_export_manager)?)
+        Ok(MemBase::from_gl(c, flags, gl_export_manager)?)
     } else {
         Err(CL_INVALID_CONTEXT)
     }
@@ -3152,8 +3149,8 @@ fn get_gl_object_info(
             // case they are ignored.
             // SAFETY: Caller is responsible for providing null pointers or ones
             // which are valid for a write of the appropriate size.
-            unsafe { gl_object_type.write_checked(gl_obj.gl_object_type) };
-            unsafe { gl_object_name.write_checked(gl_obj.gl_object_name) };
+            unsafe { gl_object_type.write_checked(gl_obj.cl_gl_type()?) };
+            unsafe { gl_object_name.write_checked(gl_obj.name()) };
         }
         None => {
             // CL_INVALID_GL_OBJECT if there is no GL object associated with memobj.
@@ -3188,13 +3185,27 @@ fn enqueue_acquire_gl_objects(
         return Err(CL_INVALID_GL_OBJECT);
     }
 
+    // We need to flush on the applications thread:
+    //
+    // If an OpenGL context is bound to the current thread, then any OpenGL commands which
+    //   1. affect or access the contents of a memory object listed in the mem_objects list, and
+    //   2. were issued on that OpenGL context prior to the call to clEnqueueAcquireGLObjects
+    // will complete before execution of any OpenCL commands following the clEnqueueAcquireGLObjects
+    // which affect or access any of those memory objects. If a non-NULL event object is returned,
+    // it will report completion only after completion of such OpenGL commands.
+    let fence_fd = q.context.flush_gl_mem_objects(&objs)?;
     create_and_queue(
         q,
         CL_COMMAND_ACQUIRE_GL_OBJECTS,
         evs,
         event,
         false,
-        Box::new(move |_, ctx| copy_cube_to_slice(ctx, &objs)),
+        Box::new(move |_, ctx| {
+            if let Some(fence_fd) = fence_fd {
+                ctx.import_fence(&fence_fd).gpu_wait(ctx);
+            }
+            copy_cube_to_slice(ctx, &objs)
+        }),
     )
 }
 
