@@ -1011,6 +1011,7 @@ struct zink_program {
    bool is_compute;
    bool can_precompile;
    bool uses_shobj; //whether shader objects are used; programs CANNOT mix shader objects and shader modules
+   bool precompile_done;
 
    struct zink_program_descriptor_data dd;
 
@@ -1729,6 +1730,7 @@ struct zink_context {
    uint32_t transient_attachments;
    struct pipe_framebuffer_state fb_state;
    VkFormat fb_formats[PIPE_MAX_COLOR_BUFS + 1];
+   struct zink_resource *fb_resolve[2];
 
    struct zink_vertex_elements_state *element_state;
    struct zink_rasterizer_state *rast_state;

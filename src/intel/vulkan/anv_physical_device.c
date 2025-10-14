@@ -197,7 +197,7 @@ get_device_extensions(const struct anv_physical_device *device,
       .KHR_maintenance5                      = true,
       .KHR_maintenance6                      = true,
       .KHR_maintenance7                      = true,
-      .KHR_maintenance8                      = true,
+      .KHR_maintenance8                      = false, /* Temporary, will reenable on Xe2+ */
       .KHR_maintenance9                      = true,
       .KHR_map_memory2                       = true,
       .KHR_multiview                         = true,
@@ -1632,7 +1632,11 @@ get_properties(const struct anv_physical_device *pdevice,
 
       /* Storing a 64bit address */
       props->bufferCaptureReplayDescriptorDataSize = 8;
-      props->imageCaptureReplayDescriptorDataSize = 8;
+      /* 4 64bit addresses for the worst case (multiplanar disjoint +
+       * private binding)
+       */
+      props->imageCaptureReplayDescriptorDataSize =
+         sizeof(struct anv_image_opaque_capture_data);
       /* Offset inside the reserved border color pool */
       props->samplerCaptureReplayDescriptorDataSize = 4;
 

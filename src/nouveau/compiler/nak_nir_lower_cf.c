@@ -445,10 +445,14 @@ lower_cf_func(nir_function *func)
    nir_metadata_require(old_impl, nir_metadata_dominance | nir_metadata_divergence);
 
    /* First, we temporarily get rid of SSA.  This will make all our block
-    * motion way easier.
+    * motion way easier.  Ask the pass to place reg writes directly in the
+    * immediate predecessors of the phis instead of trying to be clever.
+    * This will ensure that we never get a write to a uniform register from
+    * non-uniform control flow and makes our divergence reconstruction for
+    * phis more reliable.
     */
    nir_foreach_block(block, old_impl)
-      nir_lower_phis_to_regs_block(block);
+      nir_lower_phis_to_regs_block(block, true);
 
    /* We create a whole new nir_function_impl and copy the contents over */
    func->impl = NULL;
@@ -493,4 +497,37 @@ nak_nir_lower_cf(nir_shader *nir)
    }
 
    return progress;
+}
+
+bool
+nak_block_is_divergent(const nir_block *block)
+{
+   const nir_cf_node* node = &block->cf_node;
+
+   while (node) {
+      switch (node->type) {
+         case nir_cf_node_if: {
+            nir_if *nif = nir_cf_node_as_if(node);
+            if (nir_src_is_divergent(&nif->condition))
+               return true;
+            break;
+         }
+         case nir_cf_node_loop: {
+            nir_loop *loop = nir_cf_node_as_loop(node);
+            if (nir_loop_is_divergent(loop))
+               return true;
+            break;
+         }
+         case nir_cf_node_block: {
+            nir_block *block = nir_cf_node_as_block(node);
+            if (block->divergent)
+               return true;
+            break;
+         }
+         case nir_cf_node_function:
+            break;
+      }
+      node = node->parent;
+   }
+   return false;
 }

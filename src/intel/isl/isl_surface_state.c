@@ -753,7 +753,16 @@ isl_genX(surf_fill_state_s)(const struct isl_device *dev, void *state,
          }
       }
 
-#if GFX_VERx10 >= 125
+#if GFX_VERx10 >= 200
+      /* According to Bspec 58797 (r58646), the compression format is only
+       * used to improve compression. It is not used for decompression.
+       */
+      if (info->view->usage & (ISL_SURF_USAGE_RENDER_TARGET_BIT |
+                               ISL_SURF_USAGE_STORAGE_BIT)) {
+         s.CompressionFormat =
+            isl_get_render_compression_format(info->surf->format);
+      }
+#elif GFX_VERx10 == 125
       if (info->aux_usage == ISL_AUX_USAGE_MC) {
          s.CompressionFormat =
             get_media_compression_format(info->mc_format, info->surf->format);
@@ -1071,6 +1080,12 @@ isl_genX(buffer_fill_state_s)(const struct isl_device *dev, void *state,
 
 #if GFX_VERx10 >= 200
    s.EnableSamplerRoutetoLSC = isl_format_support_sampler_route_to_lsc(info->format);
+   /* Per-application override.
+    *
+    * Bspec 57023: "Enable Sampler Route to LSC" programming note states that,
+    * this bit can be set for surface type SURFTYPE_2D or SURFTYPE_BUFFER.
+    */
+   s.EnableSamplerRoutetoLSC &= dev->sampler_route_to_lsc;
 #endif /* if GFX_VERx10 >= 200 */
 
    s.SurfaceBaseAddress = info->address;

@@ -3285,6 +3285,10 @@ tu_reset_cmd_buffer(struct vk_command_buffer *vk_cmd_buffer,
 
    u_trace_fini(&cmd_buffer->trace);
    u_trace_init(&cmd_buffer->trace, &cmd_buffer->device->trace_context);
+   u_trace_fini(&cmd_buffer->rp_trace);
+   u_trace_init(&cmd_buffer->rp_trace, &cmd_buffer->device->trace_context);
+   cmd_buffer->trace_renderpass_start =
+      u_trace_begin_iterator(&cmd_buffer->rp_trace);
 
    cmd_buffer->state.max_vbs_bound = 0;
 
@@ -4094,11 +4098,9 @@ tu_CmdBindTransformFeedbackBuffersEXT(VkCommandBuffer commandBuffer,
    for (uint32_t i = 0; i < bindingCount; i++) {
       VK_FROM_HANDLE(tu_buffer, buf, pBuffers[i]);
       uint64_t iova = vk_buffer_address(&buf->vk, pOffsets[i]);
-      uint32_t size = buf->bo->size - (iova - buf->bo->iova);
+      uint32_t size = vk_buffer_range(&buf->vk, pOffsets[i],
+                                      pSizes ? pSizes[i] : VK_WHOLE_SIZE);
       uint32_t idx = i + firstBinding;
-
-      if (pSizes && pSizes[i] != VK_WHOLE_SIZE)
-         size = pSizes[i];
 
       /* BUFFER_BASE is 32-byte aligned, add remaining offset to BUFFER_OFFSET */
       uint32_t offset = iova & 0x1f;
@@ -8040,7 +8042,7 @@ tu_CmdEndRendering2EXT(VkCommandBuffer commandBuffer,
    }
 
    const VkRenderPassFragmentDensityMapOffsetEndInfoEXT *fdm_offset_info =
-      vk_find_struct_const(pRenderingEndInfo->pNext,
+      vk_find_struct_const(pRenderingEndInfo,
                            RENDER_PASS_FRAGMENT_DENSITY_MAP_OFFSET_END_INFO_EXT);
    const VkOffset2D *fdm_offsets =
       (fdm_offset_info && fdm_offset_info->fragmentDensityOffsetCount > 0) ?

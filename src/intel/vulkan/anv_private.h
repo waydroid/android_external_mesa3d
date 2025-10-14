@@ -1392,6 +1392,7 @@ struct anv_instance {
     bool                                        anv_upper_bound_descriptor_pool_sampler;
     bool                                        custom_border_colors_without_format;
     bool                                        vf_component_packing;
+    bool                                        large_workgroup_non_coherent_image_workaround;
 
     /* HW workarounds */
     bool                                        no_16bit;
@@ -5683,6 +5684,11 @@ struct anv_image {
    /* Whether the image was added to anv_device.image_private_objects list */
    bool device_registered;
    struct anv_image_memory_range av1_cdf_table;
+};
+
+struct anv_image_opaque_capture_data {
+   uint64_t planes[3];
+   uint64_t private_binding;
 };
 
 static inline bool

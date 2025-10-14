@@ -431,6 +431,15 @@ anv_encode_as(VkCommandBuffer commandBuffer, const struct vk_acceleration_struct
 
    anv_CmdPushConstants2KHR(commandBuffer, &push_info);
 
+   /* L1/L2 caches flushes should have been dealt with by pipeline barriers.
+    * Unfortunately some platforms require L3 flush because CS (reading the
+    * ir_internal_node_count paramters from vk_ir_header) is not L3 coherent.
+    */
+   if (!ANV_DEVINFO_HAS_COHERENT_L3_CS(cmd_buffer->device->info)) {
+      anv_add_pending_pipe_bits(cmd_buffer, ANV_PIPE_DATA_CACHE_FLUSH_BIT,
+                                "ir internal node count for dispatch");
+   }
+
    struct anv_address indirect_addr =
       anv_address_from_u64(intermediate_header_addr +
                             offsetof(struct vk_ir_header, ir_internal_node_count));
@@ -477,9 +486,6 @@ anv_init_header(VkCommandBuffer commandBuffer, const struct vk_acceleration_stru
 
    VkDeviceAddress header_addr = vk_acceleration_structure_get_va(dst);
 
-   UNUSED size_t base = offsetof(struct anv_accel_struct_header,
-                                 copy_dispatch_size);
-
    uint32_t instance_count = geometry_type == VK_GEOMETRY_TYPE_INSTANCES_KHR ?
                              state->leaf_node_count : 0;
 
@@ -488,13 +494,6 @@ anv_init_header(VkCommandBuffer commandBuffer, const struct vk_acceleration_stru
        * read by header.comp
        */
       vk_barrier_compute_w_to_compute_r(commandBuffer);
-
-      /* VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR is set, so we
-       * want to populate header.compacted_size with the compacted size, which
-       * needs to be calculated by using ir_header.dst_node_offset, which we'll
-       * access in the header.comp.
-       */
-      base = offsetof(struct anv_accel_struct_header, instance_count);
 
       VkPipeline pipeline;
       VkPipelineLayout layout;
@@ -521,6 +520,19 @@ anv_init_header(VkCommandBuffer commandBuffer, const struct vk_acceleration_stru
       vk_common_CmdDispatch(commandBuffer, 1, 1, 1);
    } else {
       vk_barrier_compute_w_to_host_r(commandBuffer);
+
+      /* L1/L2 caches flushes should have been dealt with by pipeline barriers.
+       * Unfortunately some platforms require L3 flush because CS (reading the
+       * dispatch size paramters) is not L3 coherent.
+       */
+      if (!ANV_DEVINFO_HAS_COHERENT_L3_CS(cmd_buffer->device->info)) {
+         anv_add_pending_pipe_bits(cmd_buffer, ANV_PIPE_DATA_CACHE_FLUSH_BIT,
+                                   "copy dispatch size for dispatch");
+         genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
+      }
+
+      size_t base = offsetof(struct anv_accel_struct_header,
+                             copy_dispatch_size);
 
       struct anv_accel_struct_header header = {};
 
@@ -696,6 +708,16 @@ genX(CmdBuildAccelerationStructuresKHR)(
                              ANV_CMD_SAVED_STATE_COMPUTE_PIPELINE |
                              ANV_CMD_SAVED_STATE_DESCRIPTOR_SET_ALL |
                              ANV_CMD_SAVED_STATE_PUSH_CONSTANTS, &saved);
+
+   /* Apply any outstanding accumulated PC bits before we proceed on building
+    * Acceleration Structure.
+    *
+    * 2 reasons for this :
+    *    - some of the data accessed by the build might need to be flushed as a
+    *    result of a previous barrier
+    *    - the scratch buffer might get reused between builds
+    */
+   genX(cmd_buffer_apply_pipe_flushes)(cmd_buffer);
 
    vk_cmd_build_acceleration_structures(commandBuffer, &device->vk,
                                         &device->meta_device, infoCount,

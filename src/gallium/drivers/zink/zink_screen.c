@@ -1458,6 +1458,20 @@ zink_destroy_screen(struct pipe_screen *pscreen)
 {
    struct zink_screen *screen = zink_screen(pscreen);
 
+   if (!screen->device_lost && screen->queue) {
+      VkResult result = VKSCR(QueueWaitIdle)(screen->queue);
+
+      if (result != VK_SUCCESS)
+         mesa_loge("ZINK: vkQueueWaitIdle failed (%s)", vk_Result_to_str(result));
+
+      if (screen->queue_sparse && screen->queue_sparse != screen->queue) {
+         result = VKSCR(QueueWaitIdle)(screen->queue_sparse);
+
+         if (result != VK_SUCCESS)
+            mesa_loge("ZINK: vkQueueWaitIdle failed (%s)", vk_Result_to_str(result));
+      }
+   }
+
    if (screen->renderdoc_capture_all && p_atomic_dec_zero(&num_screens))
       screen->renderdoc_api->EndFrameCapture(RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(screen->instance), NULL);
 
@@ -1483,6 +1497,11 @@ zink_destroy_screen(struct pipe_screen *pscreen)
    if (screen->gfx_push_constant_layout)
       VKSCR(DestroyPipelineLayout)(screen->dev, screen->gfx_push_constant_layout, NULL);
 
+   for (unsigned i = 0; i < ARRAY_SIZE(screen->pipeline_libs); i++) {
+      ralloc_free(screen->pipeline_libs[i].table);
+      screen->pipeline_libs[i].table = NULL;
+   }
+
    u_transfer_helper_destroy(pscreen->transfer_helper);
    if (util_queue_is_initialized(&screen->cache_get_thread)) {
       util_queue_finish(&screen->cache_get_thread);
@@ -1496,11 +1515,6 @@ zink_destroy_screen(struct pipe_screen *pscreen)
    }
 #endif
    disk_cache_destroy(screen->disk_cache);
-
-   /* we don't have an API to check if a set is already initialized */
-   for (unsigned i = 0; i < ARRAY_SIZE(screen->pipeline_libs); i++)
-      if (screen->pipeline_libs[i].table)
-         _mesa_set_clear(&screen->pipeline_libs[i], NULL);
 
    zink_bo_deinit(screen);
    util_live_shader_cache_deinit(&screen->shaders);

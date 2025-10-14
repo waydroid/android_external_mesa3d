@@ -1030,6 +1030,100 @@ fail:
 }
 
 static VkResult
+vk_queue_submit_move_binary_waits_to_temps(struct vk_device *device,
+                                           struct vk_queue_submit *submit,
+                                           bool move_non_shared)
+{
+   VkResult result;
+
+   if (!submit->_has_binary_permanent_semaphore_wait)
+      return VK_SUCCESS;
+
+   for (uint32_t i = 0; i < submit->wait_count; i++) {
+      if (submit->waits[i].sync->flags & VK_SYNC_IS_TIMELINE)
+         continue;
+
+      /* From the Vulkan 1.2.194 spec:
+       *
+       *    "When a batch is submitted to a queue via a queue
+       *    submission, and it includes semaphores to be waited on,
+       *    it defines a memory dependency between prior semaphore
+       *    signal operations and the batch, and defines semaphore
+       *    wait operations.
+       *
+       *    Such semaphore wait operations set the semaphores
+       *    created with a VkSemaphoreType of
+       *    VK_SEMAPHORE_TYPE_BINARY to the unsignaled state."
+       *
+       * For threaded submit, we depend on tracking the unsignaled
+       * state of binary semaphores to determine when we can safely
+       * submit.  The VK_SYNC_WAIT_PENDING check above as well as the
+       * one in the sumbit thread depend on all binary semaphores
+       * being reset when they're not in active use from the point
+       * of view of the client's CPU timeline.  This means we need to
+       * reset them inside vkQueueSubmit and cannot wait until the
+       * actual submit which happens later in the thread.
+       *
+       * We've already stolen temporary semaphore payloads above as
+       * part of basic semaphore processing.  We steal permanent
+       * semaphore payloads here by way of vk_sync_move.  For shared
+       * semaphores, this can be a bit expensive (sync file import
+       * and export) but, for non-shared semaphores, it can be made
+       * fairly cheap.  Also, we only do this semaphore swapping in
+       * the case where you have real timelines AND the client is
+       * using timeline semaphores with wait-before-signal (that's
+       * the only way to get a submit thread) AND mixing those with
+       * waits on binary semaphores AND said binary semaphore is
+       * using its permanent payload.  In other words, this code
+       * should basically only ever get executed in CTS tests.
+       */
+      if (submit->_wait_temps[i] != NULL)
+         continue;
+
+      if (!move_non_shared &&
+          !(submit->waits[i].sync->flags & VK_SYNC_IS_SHARED))
+         continue;
+
+      /* From the Vulkan 1.2.194 spec:
+       *
+       *    VUID-vkQueueSubmit-pWaitSemaphores-03238
+       *
+       *    "All elements of the pWaitSemaphores member of all
+       *    elements of pSubmits created with a VkSemaphoreType of
+       *    VK_SEMAPHORE_TYPE_BINARY must reference a semaphore
+       *    signal operation that has been submitted for execution
+       *    and any semaphore signal operations on which it depends
+       *    (if any) must have also been submitted for execution."
+       *
+       * Therefore, we can safely do a blocking wait here and it
+       * won't actually block for long.  This ensures that the
+       * vk_sync_move below will succeed.
+       */
+      result = vk_sync_wait(device, submit->waits[i].sync, 0,
+                            VK_SYNC_WAIT_PENDING, UINT64_MAX);
+      if (unlikely(result != VK_SUCCESS))
+         return result;
+
+      result = vk_sync_create(device,
+                              submit->waits[i].sync->type,
+                              0 /* flags */,
+                              0 /* initial value */,
+                              &submit->_wait_temps[i]);
+      if (unlikely(result != VK_SUCCESS))
+         return result;
+
+      result = vk_sync_move(device, submit->_wait_temps[i],
+                            submit->waits[i].sync);
+      if (unlikely(result != VK_SUCCESS))
+         return result;
+
+      submit->waits[i].sync = submit->_wait_temps[i];
+   }
+
+   return VK_SUCCESS;
+}
+
+static VkResult
 vk_queue_submit(struct vk_queue *queue,
                 struct vk_queue_submit *submit)
 {
@@ -1058,6 +1152,22 @@ vk_queue_submit(struct vk_queue *queue,
 
    switch (queue->submit.mode) {
    case VK_QUEUE_SUBMIT_MODE_IMMEDIATE:
+      /* If threaded submit is possible on this device, we need to ensure that
+       * binary semaphore payloads get reset so that any other threads can
+       * properly wait on them for dependency checking.  Because we don't
+       * currently have a submit thread, we can directly reset most binary
+       * semaphore payloads.  However, for shared semaphores the loop below
+       * doesn't work because we we can't reliably check that a wait was never
+       * signaled since two different vk_sync structs can refer to the same
+       * underlying sync primitive.  For shared semaphores, we have to fall
+       * back to moving them to temporaries like we do in the threaded case.
+       */
+      if (vk_device_supports_threaded_submit(device)) {
+         result = vk_queue_submit_move_binary_waits_to_temps(device, submit, false);
+         if (unlikely(result != VK_SUCCESS))
+            goto fail;
+      }
+
       result = vk_queue_submit_final(queue, submit);
       if (unlikely(result != VK_SUCCESS))
          goto fail;
@@ -1068,7 +1178,7 @@ vk_queue_submit(struct vk_queue *queue,
        * currently have a submit thread, we can directly reset that binary
        * semaphore payloads.
        *
-       * If we the vk_sync is in our signal et, we can consider it to have
+       * If we the vk_sync is in our signal set, we can consider it to have
        * been both reset and signaled by queue_submit_final().  A reset in
        * this case would be wrong because it would throw away our signal
        * operation.  If we don't signal the vk_sync, then we need to reset it.
@@ -1105,86 +1215,9 @@ vk_queue_submit(struct vk_queue *queue,
       return vk_device_flush(queue->base.device);
 
    case VK_QUEUE_SUBMIT_MODE_THREADED:
-      if (submit->_has_binary_permanent_semaphore_wait) {
-         for (uint32_t i = 0; i < submit->wait_count; i++) {
-            if (submit->waits[i].sync->flags & VK_SYNC_IS_TIMELINE)
-               continue;
-
-            /* From the Vulkan 1.2.194 spec:
-             *
-             *    "When a batch is submitted to a queue via a queue
-             *    submission, and it includes semaphores to be waited on,
-             *    it defines a memory dependency between prior semaphore
-             *    signal operations and the batch, and defines semaphore
-             *    wait operations.
-             *
-             *    Such semaphore wait operations set the semaphores
-             *    created with a VkSemaphoreType of
-             *    VK_SEMAPHORE_TYPE_BINARY to the unsignaled state."
-             *
-             * For threaded submit, we depend on tracking the unsignaled
-             * state of binary semaphores to determine when we can safely
-             * submit.  The VK_SYNC_WAIT_PENDING check above as well as the
-             * one in the sumbit thread depend on all binary semaphores
-             * being reset when they're not in active use from the point
-             * of view of the client's CPU timeline.  This means we need to
-             * reset them inside vkQueueSubmit and cannot wait until the
-             * actual submit which happens later in the thread.
-             *
-             * We've already stolen temporary semaphore payloads above as
-             * part of basic semaphore processing.  We steal permanent
-             * semaphore payloads here by way of vk_sync_move.  For shared
-             * semaphores, this can be a bit expensive (sync file import
-             * and export) but, for non-shared semaphores, it can be made
-             * fairly cheap.  Also, we only do this semaphore swapping in
-             * the case where you have real timelines AND the client is
-             * using timeline semaphores with wait-before-signal (that's
-             * the only way to get a submit thread) AND mixing those with
-             * waits on binary semaphores AND said binary semaphore is
-             * using its permanent payload.  In other words, this code
-             * should basically only ever get executed in CTS tests.
-             */
-            if (submit->_wait_temps[i] != NULL)
-               continue;
-
-            /* From the Vulkan 1.2.194 spec:
-             *
-             *    VUID-vkQueueSubmit-pWaitSemaphores-03238
-             *
-             *    "All elements of the pWaitSemaphores member of all
-             *    elements of pSubmits created with a VkSemaphoreType of
-             *    VK_SEMAPHORE_TYPE_BINARY must reference a semaphore
-             *    signal operation that has been submitted for execution
-             *    and any semaphore signal operations on which it depends
-             *    (if any) must have also been submitted for execution."
-             *
-             * Therefore, we can safely do a blocking wait here and it
-             * won't actually block for long.  This ensures that the
-             * vk_sync_move below will succeed.
-             */
-            result = vk_sync_wait(queue->base.device,
-                                  submit->waits[i].sync, 0,
-                                  VK_SYNC_WAIT_PENDING, UINT64_MAX);
-            if (unlikely(result != VK_SUCCESS))
-               goto fail;
-
-            result = vk_sync_create(queue->base.device,
-                                    submit->waits[i].sync->type,
-                                    0 /* flags */,
-                                    0 /* initial value */,
-                                    &submit->_wait_temps[i]);
-            if (unlikely(result != VK_SUCCESS))
-               goto fail;
-
-            result = vk_sync_move(queue->base.device,
-                                  submit->_wait_temps[i],
-                                  submit->waits[i].sync);
-            if (unlikely(result != VK_SUCCESS))
-               goto fail;
-
-            submit->waits[i].sync = submit->_wait_temps[i];
-         }
-      }
+      result = vk_queue_submit_move_binary_waits_to_temps(device, submit, true);
+      if (unlikely(result != VK_SUCCESS))
+         goto fail;
 
       /* If we're signaling a memory object, we have to ensure that
        * vkQueueSubmit does not return until the kernel submission has
@@ -1457,36 +1490,6 @@ vk_common_QueueBindSparse(VkQueue _queue,
    for (uint32_t i = 0; i < bindInfoCount; i++) {
       const VkTimelineSemaphoreSubmitInfo *timeline_info =
          vk_find_struct_const(pBindInfo[i].pNext, TIMELINE_SEMAPHORE_SUBMIT_INFO);
-      const uint64_t *wait_values = NULL;
-      const uint64_t *signal_values = NULL;
-
-      if (timeline_info && timeline_info->waitSemaphoreValueCount) {
-         /* From the Vulkan 1.3.204 spec:
-          *
-          *    VUID-VkBindSparseInfo-pNext-03248
-          *
-          *    "If the pNext chain of this structure includes a VkTimelineSemaphoreSubmitInfo structure
-          *    and any element of pSignalSemaphores was created with a VkSemaphoreType of
-          *    VK_SEMAPHORE_TYPE_TIMELINE, then its signalSemaphoreValueCount member must equal
-          *    signalSemaphoreCount"
-          */
-         assert(timeline_info->waitSemaphoreValueCount == pBindInfo[i].waitSemaphoreCount);
-         wait_values = timeline_info->pWaitSemaphoreValues;
-      }
-
-      if (timeline_info && timeline_info->signalSemaphoreValueCount) {
-         /* From the Vulkan 1.3.204 spec:
-          *
-          * VUID-VkBindSparseInfo-pNext-03247
-          *
-          *    "If the pNext chain of this structure includes a VkTimelineSemaphoreSubmitInfo structure
-          *    and any element of pWaitSemaphores was created with a VkSemaphoreType of
-          *    VK_SEMAPHORE_TYPE_TIMELINE, then its waitSemaphoreValueCount member must equal
-          *    waitSemaphoreCount"
-          */
-         assert(timeline_info->signalSemaphoreValueCount == pBindInfo[i].signalSemaphoreCount);
-         signal_values = timeline_info->pSignalSemaphoreValues;
-      }
 
       STACK_ARRAY(VkSemaphoreSubmitInfo, wait_semaphore_infos,
                   pBindInfo[i].waitSemaphoreCount);
@@ -1500,18 +1503,52 @@ vk_common_QueueBindSparse(VkQueue _queue,
       }
 
       for (uint32_t j = 0; j < pBindInfo[i].waitSemaphoreCount; j++) {
+         VK_FROM_HANDLE(vk_semaphore, semaphore, pBindInfo[i].pWaitSemaphores[j]);
+
+         uint64_t wait_value = 0;
+         if (timeline_info && semaphore->type == VK_SEMAPHORE_TYPE_TIMELINE) {
+            /* From the Vulkan 1.3.204 spec:
+             *
+             *    VUID-VkBindSparseInfo-pNext-03248
+             *
+             *    "If the pNext chain of this structure includes a VkTimelineSemaphoreSubmitInfo structure
+             *    and any element of pSignalSemaphores was created with a VkSemaphoreType of
+             *    VK_SEMAPHORE_TYPE_TIMELINE, then its signalSemaphoreValueCount member must equal
+             *    signalSemaphoreCount"
+             */
+            assert(timeline_info->waitSemaphoreValueCount == pBindInfo[i].waitSemaphoreCount);
+            wait_value = timeline_info->pWaitSemaphoreValues[j];
+         }
+
          wait_semaphore_infos[j] = (VkSemaphoreSubmitInfo) {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
             .semaphore = pBindInfo[i].pWaitSemaphores[j],
-            .value = wait_values ? wait_values[j] : 0,
+            .value = wait_value,
          };
       }
 
       for (uint32_t j = 0; j < pBindInfo[i].signalSemaphoreCount; j++) {
+         VK_FROM_HANDLE(vk_semaphore, semaphore, pBindInfo[i].pSignalSemaphores[j]);
+
+         uint64_t signal_value = 0;
+         if (timeline_info && semaphore->type == VK_SEMAPHORE_TYPE_TIMELINE) {
+            /* From the Vulkan 1.3.204 spec:
+             *
+             * VUID-VkBindSparseInfo-pNext-03247
+             *
+             *    "If the pNext chain of this structure includes a VkTimelineSemaphoreSubmitInfo structure
+             *    and any element of pWaitSemaphores was created with a VkSemaphoreType of
+             *    VK_SEMAPHORE_TYPE_TIMELINE, then its waitSemaphoreValueCount member must equal
+             *    waitSemaphoreCount"
+             */
+            assert(timeline_info->signalSemaphoreValueCount == pBindInfo[i].signalSemaphoreCount);
+            signal_value = timeline_info->pSignalSemaphoreValues[j];
+         }
+
          signal_semaphore_infos[j] = (VkSemaphoreSubmitInfo) {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
             .semaphore = pBindInfo[i].pSignalSemaphores[j],
-            .value = signal_values ? signal_values[j] : 0,
+            .value = signal_value,
          };
       }
       struct vulkan_submit_info info = {

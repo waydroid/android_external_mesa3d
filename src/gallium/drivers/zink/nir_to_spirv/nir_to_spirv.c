@@ -630,7 +630,7 @@ get_glsl_type(struct ntv_context *ctx, const struct glsl_type *type, bool implic
                                       glsl_get_length(type));
       for (unsigned i = 0; i < glsl_get_length(type); i++) {
          int32_t offset = glsl_get_struct_field_offset(type, i);
-         if (offset >= 0)
+         if (offset >= 0 && !implicit_stride)
             spirv_builder_emit_member_offset(&ctx->builder, ret, i, offset);
       }
    } else
@@ -3327,6 +3327,16 @@ emit_subgroup(struct ntv_context *ctx, nir_intrinsic_instr *intr)
    case SpvOpGroupNonUniformFMin:
    case SpvOpGroupNonUniformFMax:
       atype = nir_type_float;
+      src0 = emit_bitcast(ctx, get_def_type(ctx, intr->src[0].ssa, atype), src0);
+      break;
+   case SpvOpGroupNonUniformUMin:
+   case SpvOpGroupNonUniformUMax:
+      atype = nir_type_uint;
+      src0 = emit_bitcast(ctx, get_def_type(ctx, intr->src[0].ssa, atype), src0);
+      break;
+   case SpvOpGroupNonUniformSMin:
+   case SpvOpGroupNonUniformSMax:
+      atype = nir_type_int;
       src0 = emit_bitcast(ctx, get_def_type(ctx, intr->src[0].ssa, atype), src0);
       break;
    default: break;

@@ -3,6 +3,8 @@
 
 extern crate nvidia_headers;
 
+use std::mem::size_of;
+
 use compiler::bindings::*;
 use nak_bindings::*;
 use nvidia_headers::classes::{cla0c0, clc0c0, clc3c0, clc6c0, clcbc0, clcdc0};
@@ -67,6 +69,8 @@ macro_rules! qmd_impl_common {
         }
 
         const GLOBAL_SIZE_LAYOUT: nak_qmd_dispatch_size_layout = {
+            assert!(NAK_MAX_QMD_SIZE_B as usize >= size_of::<Self>());
+
             let w = paste! {$c::[<$s _CTA_RASTER_WIDTH>]};
             let h = paste! {$c::[<$s _CTA_RASTER_HEIGHT>]};
             let d = paste! {$c::[<$s _CTA_RASTER_DEPTH>]};
@@ -472,12 +476,12 @@ mod qmd_4_0 {
 
     #[repr(transparent)]
     pub struct Qmd4_0 {
-        qmd: [u32; 64],
+        qmd: [u32; 96],
     }
 
     impl QMD for Qmd4_0 {
         fn new() -> Self {
-            let mut qmd = [0; 64];
+            let mut qmd = [0; 96];
             let mut bv = QMDBitView::new(&mut qmd);
             qmd_init!(bv, clcbc0, QMDV04_00, 4, 0);
             Self { qmd }
@@ -514,12 +518,12 @@ mod qmd_5_0 {
     }
 
     pub struct Qmd5_0 {
-        qmd: [u32; 64],
+        qmd: [u32; 96],
     }
 
     impl QMD for Qmd5_0 {
         fn new() -> Self {
-            let mut qmd = [0; 64];
+            let mut qmd = [0; 96];
             let mut bv = QMDBitView::new(&mut qmd);
             qmd_init!(bv, clcdc0, QMDV05_00, 5, 0);
             set_field!(bv, clcdc0, QMDV05_00, QMD_TYPE, 0x2);
@@ -578,6 +582,27 @@ fn fill_qmd<Q: QMD>(info: &nak_shader_info, qmd_info: &nak_qmd_info) -> Q {
     }
 
     qmd
+}
+
+#[no_mangle]
+pub extern "C" fn nak_qmd_size_B(dev: &nv_device_info) -> u32 {
+    let size_B = if dev.cls_compute >= clcdc0::BLACKWELL_COMPUTE_A {
+        size_of::<Qmd5_0>().try_into().unwrap()
+    } else if dev.cls_compute >= clcbc0::HOPPER_COMPUTE_A {
+        size_of::<Qmd4_0>().try_into().unwrap()
+    } else if dev.cls_compute >= clc6c0::AMPERE_COMPUTE_A {
+        size_of::<Qmd3_0>().try_into().unwrap()
+    } else if dev.cls_compute >= clc3c0::VOLTA_COMPUTE_A {
+        size_of::<Qmd2_2>().try_into().unwrap()
+    } else if dev.cls_compute >= clc0c0::PASCAL_COMPUTE_A {
+        size_of::<Qmd2_1>().try_into().unwrap()
+    } else if dev.cls_compute >= cla0c0::KEPLER_COMPUTE_A {
+        size_of::<Qmd0_6>().try_into().unwrap()
+    } else {
+        panic!("Unknown shader model");
+    };
+    assert!(size_B <= NAK_MAX_QMD_SIZE_B);
+    size_B
 }
 
 #[no_mangle]

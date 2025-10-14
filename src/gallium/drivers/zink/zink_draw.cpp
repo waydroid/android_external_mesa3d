@@ -270,8 +270,8 @@ update_gfx_pipeline(struct zink_context *ctx, struct zink_batch_state *bs, enum 
          pipeline = zink_get_gfx_pipeline<DYNAMIC_STATE, false>(ctx, ctx->curr_program, &ctx->gfx_pipeline_state, mode);
    }
    if (pipeline) {
-      pipeline_changed = prev_pipeline != pipeline;
-      if (BATCH_CHANGED || pipeline_changed || ctx->shobj_draw)
+      pipeline_changed = prev_pipeline != pipeline || ctx->shobj_draw;
+      if (BATCH_CHANGED || pipeline_changed)
          VKCTX(CmdBindPipeline)(bs->cmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
       ctx->shobj_draw = false;
    } else {
@@ -289,6 +289,7 @@ update_gfx_pipeline(struct zink_context *ctx, struct zink_batch_state *bs, enum 
          VKCTX(CmdSetTessellationDomainOriginEXT)(bs->cmdbuf, VK_TESSELLATION_DOMAIN_ORIGIN_LOWER_LEFT);
          VKCTX(CmdSetSampleLocationsEnableEXT)(bs->cmdbuf, ctx->gfx_pipeline_state.sample_locations_enabled);
          VKCTX(CmdSetRasterizationStreamEXT)(bs->cmdbuf, 0);
+         pipeline_changed = true;
       }
       ctx->shobj_draw = true;
    }
@@ -1017,6 +1018,8 @@ zink_draw_vertex_state(struct pipe_context *pctx,
    zink_draw<HAS_MULTIDRAW, DYNAMIC_STATE, BATCH_CHANGED, true>(pctx, &dinfo, 0, NULL, draws, num_draws, vstate, partial_velem_mask);
    /* ensure ctx->vertex_buffers gets rebound on next non-vstate draw */
    ctx->vertex_buffers_dirty = true;
+   /* ensure ctx->element_state gets rebound on next non-vstate draw */
+   ctx->vertex_state_changed = true;
 
    if (info.take_vertex_state_ownership)
       pipe_vertex_state_reference(&vstate, NULL);
@@ -1321,14 +1324,14 @@ zink_init_grid_functions(struct zink_context *ctx)
 void
 zink_init_screen_pipeline_libs(struct zink_screen *screen)
 {
-   _mesa_set_init(&screen->pipeline_libs[0], screen, hash_gfx_program<0>, equals_gfx_program<0>);
-   _mesa_set_init(&screen->pipeline_libs[1], screen, hash_gfx_program<1>, equals_gfx_program<1>);
-   _mesa_set_init(&screen->pipeline_libs[2], screen, hash_gfx_program<2>, equals_gfx_program<2>);
-   _mesa_set_init(&screen->pipeline_libs[3], screen, hash_gfx_program<3>, equals_gfx_program<3>);
-   _mesa_set_init(&screen->pipeline_libs[4], screen, hash_gfx_program<4>, equals_gfx_program<4>);
-   _mesa_set_init(&screen->pipeline_libs[5], screen, hash_gfx_program<5>, equals_gfx_program<5>);
-   _mesa_set_init(&screen->pipeline_libs[6], screen, hash_gfx_program<6>, equals_gfx_program<6>);
-   _mesa_set_init(&screen->pipeline_libs[7], screen, hash_gfx_program<7>, equals_gfx_program<7>);
+   _mesa_set_init(&screen->pipeline_libs[0], NULL, hash_gfx_program<0>, equals_gfx_program<0>);
+   _mesa_set_init(&screen->pipeline_libs[1], NULL, hash_gfx_program<1>, equals_gfx_program<1>);
+   _mesa_set_init(&screen->pipeline_libs[2], NULL, hash_gfx_program<2>, equals_gfx_program<2>);
+   _mesa_set_init(&screen->pipeline_libs[3], NULL, hash_gfx_program<3>, equals_gfx_program<3>);
+   _mesa_set_init(&screen->pipeline_libs[4], NULL, hash_gfx_program<4>, equals_gfx_program<4>);
+   _mesa_set_init(&screen->pipeline_libs[5], NULL, hash_gfx_program<5>, equals_gfx_program<5>);
+   _mesa_set_init(&screen->pipeline_libs[6], NULL, hash_gfx_program<6>, equals_gfx_program<6>);
+   _mesa_set_init(&screen->pipeline_libs[7], NULL, hash_gfx_program<7>, equals_gfx_program<7>);
    for (unsigned i = 0; i < ARRAY_SIZE(screen->pipeline_libs_lock); i++)
       simple_mtx_init(&screen->pipeline_libs_lock[i], mtx_plain);
 }

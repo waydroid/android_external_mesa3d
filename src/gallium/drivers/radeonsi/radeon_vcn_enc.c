@@ -206,10 +206,10 @@ static void radeon_vcn_enc_get_roi_param(struct radeon_encoder *enc,
             } else
                map->qp_delta = region->qp_value;
 
-            map->x_in_unit = CLAMP((region->x / block_length), 0, width_in_block - 1);
-            map->y_in_unit = CLAMP((region->y / block_length), 0, height_in_block - 1);
-            map->width_in_unit = CLAMP((region->width / block_length), 0, width_in_block);
-            map->height_in_unit = CLAMP((region->height / block_length), 0, width_in_block);
+            map->x_in_unit = MIN2(DIV_ROUND_UP(region->x, block_length), width_in_block - 1);
+            map->y_in_unit = MIN2(DIV_ROUND_UP(region->y, block_length), height_in_block - 1);
+            map->width_in_unit = MIN2(DIV_ROUND_UP(region->width, block_length), width_in_block);
+            map->height_in_unit = MIN2(DIV_ROUND_UP(region->height, block_length), width_in_block);
          }
       }
    }
@@ -293,7 +293,9 @@ static void radeon_vcn_enc_h264_get_spec_misc_param(struct radeon_encoder *enc,
    enc->enc_pic.spec_misc.redundant_pic_cnt_present_flag =
       pic->pic_ctrl.redundant_pic_cnt_present_flag;
    enc->enc_pic.spec_misc.b_picture_enabled = !!pic->seq.max_num_reorder_frames;
+   /* FW issue when using constrained intra pred with rate control. */
    enc->enc_pic.spec_misc.constrained_intra_pred_flag =
+      !enc->enc_pic.rc_session_init.rate_control_method &&
       pic->pic_ctrl.constrained_intra_pred_flag;
    enc->enc_pic.spec_misc.half_pel_enabled = 1;
    enc->enc_pic.spec_misc.quarter_pel_enabled = 1;
@@ -302,6 +304,7 @@ static void radeon_vcn_enc_h264_get_spec_misc_param(struct radeon_encoder *enc,
       pic->pic_ctrl.weighted_bipred_idc : 0;
    enc->enc_pic.spec_misc.transform_8x8_mode =
       sscreen->info.vcn_ip_version >= VCN_5_0_0 &&
+      enc->enc_pic.spec_misc.cabac_enable &&
       pic->pic_ctrl.transform_8x8_mode_flag;
    enc->enc_pic.spec_misc.level_idc = pic->seq.level_idc;
 }
@@ -624,6 +627,32 @@ static void radeon_vcn_enc_hevc_get_dbk_param(struct radeon_encoder *enc,
       !pic->seq.sample_adaptive_offset_enabled_flag;
 }
 
+static bool cu_qp_delta_supported(struct si_screen *sscreen)
+{
+   if (sscreen->info.vcn_ip_version >= VCN_5_0_0)
+      return true;
+   else if (sscreen->info.vcn_ip_version >= VCN_4_0_0)
+      return sscreen->info.vcn_enc_minor_version >= 7;
+   else if (sscreen->info.vcn_ip_version >= VCN_3_0_0)
+      return sscreen->info.vcn_enc_minor_version >= 26;
+   else if (sscreen->info.vcn_ip_version >= VCN_2_0_0)
+      return sscreen->info.vcn_enc_minor_version >= 20;
+   else
+      return false;
+}
+
+static bool transform_skip_supported(struct si_screen *sscreen)
+{
+   if (sscreen->info.vcn_ip_version >= VCN_5_0_0)
+      return true;
+   else if (sscreen->info.vcn_ip_version >= VCN_4_0_0)
+      return sscreen->info.vcn_enc_minor_version >= 2;
+   else if (sscreen->info.vcn_ip_version >= VCN_3_0_0)
+      return sscreen->info.vcn_enc_minor_version >= 23;
+   else
+      return false;
+}
+
 static void radeon_vcn_enc_hevc_get_spec_misc_param(struct radeon_encoder *enc,
                                                     struct pipe_h265_enc_picture_desc *pic)
 {
@@ -634,17 +663,18 @@ static void radeon_vcn_enc_hevc_get_spec_misc_param(struct radeon_encoder *enc,
    enc->enc_pic.hevc_spec_misc.amp_disabled = !pic->seq.amp_enabled_flag;
    enc->enc_pic.hevc_spec_misc.strong_intra_smoothing_enabled =
       pic->seq.strong_intra_smoothing_enabled_flag;
+   /* FW issue when using constrained intra pred with rate control. */
    enc->enc_pic.hevc_spec_misc.constrained_intra_pred_flag =
+      !enc->enc_pic.rc_session_init.rate_control_method &&
       pic->pic.constrained_intra_pred_flag;
    enc->enc_pic.hevc_spec_misc.cabac_init_flag = pic->slice.cabac_init_flag;
    enc->enc_pic.hevc_spec_misc.half_pel_enabled = 1;
    enc->enc_pic.hevc_spec_misc.quarter_pel_enabled = 1;
    enc->enc_pic.hevc_spec_misc.transform_skip_disabled =
-      sscreen->info.vcn_ip_version < VCN_3_0_0 ||
+      !transform_skip_supported(sscreen) ||
       !pic->pic.transform_skip_enabled_flag;
    enc->enc_pic.hevc_spec_misc.cu_qp_delta_enabled_flag =
-      (sscreen->info.vcn_ip_version >= VCN_2_0_0 &&
-      pic->pic.cu_qp_delta_enabled_flag) ||
+      (cu_qp_delta_supported(sscreen) && pic->pic.cu_qp_delta_enabled_flag) ||
       enc->enc_pic.enc_qp_map.qp_map_type ||
       enc->enc_pic.rc_session_init.rate_control_method;
 }

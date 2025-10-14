@@ -361,6 +361,10 @@ enum opcode {
     * Return the index of the first enabled live channel and assign it to
     * to the first component of the destination.  Frequently used as input
     * for the BROADCAST pseudo-opcode.
+    *
+    * Source 0: A value.
+    * Source 1: Index from Value to broadcast.
+    * Source 2: A size in byte of the value register.
     */
    SHADER_OPCODE_FIND_LIVE_CHANNEL,
 
@@ -606,8 +610,6 @@ enum tex_logical_srcs {
    TEX_LOGICAL_SRC_SAMPLER_HANDLE,
    /** Texel offset for gathers */
    TEX_LOGICAL_SRC_TG4_OFFSET,
-   /** Texture offset */
-   TEX_LOGICAL_SRC_PACKED_OFFSET,
    /** REQUIRED: Number of coordinate components (as UD immediate) */
    TEX_LOGICAL_SRC_COORD_COMPONENTS,
    /** REQUIRED: Number of derivative components (as UD immediate) */

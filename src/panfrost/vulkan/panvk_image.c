@@ -425,15 +425,16 @@ panvk_image_init(struct panvk_image *image,
 
 static VkResult
 panvk_image_plane_bind(struct panvk_device *dev,
-                       struct panvk_image_plane *plane, struct pan_kmod_bo *bo,
-                       uint64_t base, uint64_t offset)
+                       struct panvk_image_plane *plane,
+                       struct panvk_device_memory *mem, uint64_t offset)
 {
-   plane->plane.base = base + offset;
-   plane->offset = offset;
+   plane->plane.base = mem->addr.dev + offset;
+   plane->mem = mem;
+   plane->mem_offset = offset;
    /* Reset the AFBC headers */
    if (drm_is_afbc(plane->image.props.modifier)) {
       /* Transient CPU mapping */
-      void *bo_base = pan_kmod_bo_mmap(bo, 0, pan_kmod_bo_size(bo),
+      void *bo_base = pan_kmod_bo_mmap(mem->bo, 0, pan_kmod_bo_size(mem->bo),
                                        PROT_WRITE, MAP_SHARED, NULL);
 
       if (bo_base == MAP_FAILED)
@@ -459,7 +460,7 @@ panvk_image_plane_bind(struct panvk_device *dev,
          }
       }
 
-      ASSERTED int ret = os_munmap(bo_base, pan_kmod_bo_size(bo));
+      ASSERTED int ret = os_munmap(bo_base, pan_kmod_bo_size(mem->bo));
       assert(!ret);
    }
 
@@ -681,6 +682,7 @@ panvk_image_bind(struct panvk_device *dev,
                  const VkBindImageMemoryInfo *bind_info) {
    VK_FROM_HANDLE(panvk_image, image, bind_info->image);
    VK_FROM_HANDLE(panvk_device_memory, mem, bind_info->memory);
+   uint64_t offset = bind_info->memoryOffset;
 
    if (!mem) {
 #if DETECT_OS_ANDROID
@@ -694,23 +696,21 @@ panvk_image_bind(struct panvk_device *dev,
       VkDeviceMemory mem_handle = wsi_common_get_memory(
          swapchain_info->swapchain, swapchain_info->imageIndex);
       mem = panvk_device_memory_from_handle(mem_handle);
+      offset = 0;
 #endif
    }
 
    assert(mem);
-   image->mem = mem;
    if (is_disjoint(image)) {
       const VkBindImagePlaneMemoryInfo *plane_info =
          vk_find_struct_const(bind_info->pNext, BIND_IMAGE_PLANE_MEMORY_INFO);
       const uint8_t plane =
          panvk_plane_index(image->vk.format, plane_info->planeAspect);
-      return panvk_image_plane_bind(dev, &image->planes[plane], mem->bo,
-                                    mem->addr.dev, bind_info->memoryOffset);
+      return panvk_image_plane_bind(dev, &image->planes[plane], mem, offset);
    } else {
       for (unsigned plane = 0; plane < image->plane_count; plane++) {
          VkResult result =
-            panvk_image_plane_bind(dev, &image->planes[plane], mem->bo,
-                                   mem->addr.dev, bind_info->memoryOffset);
+            panvk_image_plane_bind(dev, &image->planes[plane], mem, offset);
          if (result != VK_SUCCESS)
             return result;
       }

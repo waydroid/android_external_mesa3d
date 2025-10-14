@@ -1948,7 +1948,6 @@ brw_vectorize_lower_mem_access(nir_shader *nir,
          .buffer_max        = UINT32_MAX,
          .shared_max        = UINT32_MAX,
          .shared_atomic_max = UINT32_MAX,
-         .uniform_max       = UINT32_MAX,
       };
       OPT(nir_opt_offsets, &offset_options);
 
@@ -2012,7 +2011,11 @@ brw_postprocess_nir(nir_shader *nir, const struct brw_compiler *compiler,
    if (OPT(nir_lower_tex, &tex_options))
       OPT(nir_lower_tex, &tex_options);
 
-   OPT(brw_nir_lower_texture, devinfo);
+   const struct brw_nir_lower_texture_opts brw_tex_options = {
+      .combined_lod_and_array_index = compiler->devinfo->ver >= 20,
+      .combined_lod_or_bias_and_offset = compiler->devinfo->ver >= 20,
+   };
+   OPT(brw_nir_lower_texture, &brw_tex_options);
 
    OPT(intel_nir_lower_sparse_intrinsics);
 
