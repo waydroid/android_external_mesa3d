@@ -805,11 +805,24 @@ get_ahb_buffer_format_properties2(
       .hal_format = desc.format,
    };
 
+   /*
+    * Guard against AHB formats that gralloc cannot handle (e.g. ETC2/EAC
+    * compressed formats on GPUs that do not support them natively through
+    * AHardwareBuffer). If the native handle is invalid or gralloc cannot
+    * identify the buffer, return an error instead of crashing.
+    */
+   if (!gr_handle.handle) {
+      mesa_loge("AHardwareBuffer has no native handle (format 0x%x)",
+                desc.format);
+      return VK_ERROR_FORMAT_NOT_SUPPORTED;
+   }
+
    struct u_gralloc_buffer_basic_info info;
    if (u_gralloc_get_buffer_basic_info(vk_android_get_ugralloc(), &gr_handle,
                                        &info) != 0) {
-      mesa_loge("Failed to get u_gralloc_buffer_basic_info");
-      return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+      mesa_loge("Failed to get u_gralloc_buffer_basic_info (format 0x%x)",
+                desc.format);
+      return VK_ERROR_FORMAT_NOT_SUPPORTED;
    }
 
    switch (info.drm_fourcc) {
@@ -951,9 +964,12 @@ vk_common_GetAndroidHardwareBufferPropertiesANDROID(
       }
    }
 
-   const native_handle_t *handle = AHardwareBuffer_getNativeHandle(buffer);
-   assert(handle && handle->numFds > 0);
-   pProperties->allocationSize = lseek(handle->data[0], 0, SEEK_END);
+    const native_handle_t *handle = AHardwareBuffer_getNativeHandle(buffer);
+    if (!handle || handle->numFds <= 0) {
+       mesa_loge("AHardwareBuffer has invalid native handle");
+       return VK_ERROR_FORMAT_NOT_SUPPORTED;
+    }
+    pProperties->allocationSize = lseek(handle->data[0], 0, SEEK_END);
 
    VkMemoryFdPropertiesKHR fd_props = {
       .sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR,
