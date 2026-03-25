@@ -966,7 +966,10 @@ vk_common_GetAndroidHardwareBufferPropertiesANDROID(
 
     const native_handle_t *handle = AHardwareBuffer_getNativeHandle(buffer);
     if (!handle || handle->numFds <= 0) {
-       mesa_loge("AHardwareBuffer has invalid native handle");
+       AHardwareBuffer_Desc desc;
+       AHardwareBuffer_describe(buffer, &desc);
+       mesa_loge("AHardwareBuffer has invalid native handle (format 0x%x)",
+                 desc.format);
        return VK_ERROR_FORMAT_NOT_SUPPORTED;
     }
     pProperties->allocationSize = lseek(handle->data[0], 0, SEEK_END);
