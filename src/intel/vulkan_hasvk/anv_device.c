@@ -140,16 +140,13 @@ compiler_perf_log(UNUSED void *data, UNUSED unsigned *id, const char *fmt, ...)
 #else
 #define ANV_API_VERSION_1_3 VK_MAKE_VERSION(1, 3, VK_HEADER_VERSION)
 #define ANV_API_VERSION_1_2 VK_MAKE_VERSION(1, 2, VK_HEADER_VERSION)
+#define ANV_API_VERSION ANV_API_VERSION_1_3
 #endif
 
 VkResult anv_EnumerateInstanceVersion(
     uint32_t*                                   pApiVersion)
 {
-#ifdef ANDROID_STRICT
    *pApiVersion = ANV_API_VERSION;
-#else
-   *pApiVersion = ANV_API_VERSION_1_3;
-#endif
    return VK_SUCCESS;
 }
 
