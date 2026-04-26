@@ -112,9 +112,14 @@ for cond in ['ilt', 'ige', 'ieq', 'ine', 'ult', 'uge']:
 # automatically. Do so explicitly. (The more specific pattern must be first.)
 for bsz in [8, 16, 32]:
     for fsz in [16, 32]:
+        if bsz == fsz:
+            a_fsz = 'a'
+        else:
+            a_fsz = (f'i2i{fsz}', a)
+
         algebraic_late += [
-                ((f'b2f{fsz}', ('inot', f'a@{bsz}')), (f'b{bsz}csel', a, 0.0, 1.0)),
-                ((f'b2f{fsz}', f'a@{bsz}'), (f'b{bsz}csel', a, 1.0, 0.0)),
+            ((f'b2f{fsz}', ('inot', f'a@{bsz}')), (f'b{fsz}csel', a_fsz, 0.0, 1.0)),
+            ((f'b2f{fsz}', f'a@{bsz}'), (f'b{fsz}csel', a_fsz, 1.0, 0.0)),
         ]
 
 

@@ -63,8 +63,12 @@ brw_do_emit_fb_writes(brw_shader &s, int nr_color_regions, bool replicate_alpha)
 
    brw_fb_write_inst *write = NULL;
    for (int target = 0; target < nr_color_regions; target++) {
-      /* Skip over outputs that weren't written. */
-      if (s.outputs[target].file == BAD_FILE)
+      /* Skip over outputs that weren't written, unless dual source
+       * blending is at play. The results may be undefined depending
+       * on the blending settings, but that's what the user signed
+       * up for.
+       */
+      if (s.outputs[target].file == BAD_FILE && s.dual_src_output.file == BAD_FILE)
          continue;
 
       const brw_builder abld = bld.annotate(
@@ -143,8 +147,7 @@ brw_emit_fb_writes(brw_shader &s)
       (key->nr_color_regions > 1 && key->alpha_to_coverage &&
        s.sample_mask.file == BAD_FILE);
 
-   prog_data->dual_src_blend = (s.dual_src_output.file != BAD_FILE &&
-                                s.outputs[0].file != BAD_FILE);
+   prog_data->dual_src_blend = s.dual_src_output.file != BAD_FILE;
    assert(!prog_data->dual_src_blend || key->nr_color_regions == 1);
 
    /* Following condition implements Wa_14017468336:

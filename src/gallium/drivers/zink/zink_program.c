@@ -2119,6 +2119,10 @@ bind_last_vertex_stage(struct zink_context *ctx, mesa_shader_stage stage, struct
       ctx->last_vertex_stage ? update_rast_prim(ctx->last_vertex_stage) :
                                MESA_PRIM_COUNT;
 
+   if (ctx->last_vertex_stage && ctx->last_vertex_stage->non_fs.is_generated)
+      ctx->gfx_pipeline_state.shader_rast_prim = MESA_PRIM_COUNT;
+
+
    if (old != current) {
       if (!zink_screen(ctx->base.screen)->optimal_keys) {
          if (old != MESA_SHADER_STAGES) {

@@ -830,11 +830,12 @@ trim_constlens(unsigned *constlens, unsigned first_stage, unsigned last_stage,
       cur_total += constlens[i];
    }
 
-   unsigned max_stage = 0;
-   unsigned max_const = 0;
    uint32_t trimmed = 0;
 
    while (cur_total > combined_limit) {
+      unsigned max_stage = 0;
+      unsigned max_const = 0;
+
       for (unsigned i = first_stage; i <= last_stage; i++) {
          if (constlens[i] >= max_const) {
             max_stage = i;

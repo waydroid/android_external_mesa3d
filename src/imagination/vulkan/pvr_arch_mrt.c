@@ -169,6 +169,16 @@ static VkResult pvr_alloc_mrt(const struct pvr_device_info *dev_info,
             sizeof(alloc->tile_buffers[0U]) *
                (resource->mem.tile_buffer + 1U - alloc->tile_buffers_count));
          alloc->tile_buffers_count = resource->mem.tile_buffer + 1U;
+
+         /* Need to add the resource to the new tile buffer */
+         struct pvr_mrt_alloc_mask *tib_alloc =
+            &alloc->tile_buffers[resource->mem.tile_buffer];
+
+         ASSERTED const int32_t tile_buffer_offset =
+            pvr_mrt_alloc_from_buffer(dev_info,
+                                      tib_alloc,
+                                      pixel_size);
+         assert(tile_buffer_offset == 0);
       }
 
       /* The hardware makes the bit depth of the on-chip storage and memory
@@ -183,6 +193,37 @@ static VkResult pvr_alloc_mrt(const struct pvr_device_info *dev_info,
    resource->intermediate_size = resource->mrt_desc.intermediate_size;
 
    setup->num_render_targets++;
+
+   return VK_SUCCESS;
+}
+
+VkResult
+pvr_arch_mrt_setup_partial_init(struct pvr_device *const device,
+                                struct usc_mrt_setup *mrt_setup,
+                                uint32_t num_renger_targets,
+                                uint32_t num_output_regs,
+                                uint32_t num_tile_buffers)
+{
+   struct usc_mrt_resource *mrt_resources = NULL;
+
+   if (num_renger_targets) {
+      const uint32_t size =
+         num_renger_targets * sizeof(*mrt_setup->mrt_resources);
+
+      mrt_resources = vk_zalloc(&device->vk.alloc,
+                                size,
+                                8,
+                                VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
+      if (!mrt_resources)
+         return VK_ERROR_OUT_OF_HOST_MEMORY;
+   }
+
+   *mrt_setup = (struct usc_mrt_setup){
+      .num_render_targets = num_renger_targets,
+      .num_output_regs = num_output_regs,
+      .num_tile_buffers = num_tile_buffers,
+      .mrt_resources = mrt_resources,
+   };
 
    return VK_SUCCESS;
 }

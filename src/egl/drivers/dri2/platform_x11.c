@@ -51,7 +51,9 @@
 #include "util/log.h"
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/ipc.h>
 #include "x11_dri3.h"
+#include "x11_display.h"
 #include "kopper_interface.h"
 #include "loader.h"
 #include "platform_x11.h"
@@ -1124,37 +1126,6 @@ dri2_x11_setup_swap_interval(_EGLDisplay *disp)
 }
 
 static bool
-check_xshm(struct dri2_egl_display *dri2_dpy)
-{
-   xcb_void_cookie_t cookie;
-   xcb_generic_error_t *error;
-   int ret = true;
-   xcb_query_extension_cookie_t shm_cookie;
-   xcb_query_extension_reply_t *shm_reply;
-   bool has_mit_shm;
-
-   shm_cookie = xcb_query_extension(dri2_dpy->conn, 7, "MIT-SHM");
-   shm_reply = xcb_query_extension_reply(dri2_dpy->conn, shm_cookie, NULL);
-
-   has_mit_shm = shm_reply && shm_reply->present;
-   free(shm_reply);
-   if (!has_mit_shm)
-      return false;
-
-   cookie = xcb_shm_detach_checked(dri2_dpy->conn, 0);
-   if ((error = xcb_request_check(dri2_dpy->conn, cookie))) {
-      /* BadRequest means we're a remote client. If we were local we'd
-       * expect BadValue since 'info' has an invalid segment name.
-       */
-      if (error->error_code == BadRequest)
-         ret = false;
-      free(error);
-   }
-
-   return ret;
-}
-
-static bool
 platform_x11_finalize(_EGLDisplay *disp, bool force_zink)
 {
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
@@ -1220,7 +1191,7 @@ dri2_initialize_x11_swrast(_EGLDisplay *disp)
 {
    struct dri2_egl_display *dri2_dpy = dri2_egl_display(disp);
 
-   if (check_xshm(dri2_dpy)) {
+   if (x11_xcb_display_supports_xshm(dri2_dpy->conn)) {
       dri2_dpy->loader_extensions = swrast_loader_shm_extensions;
    } else {
       dri2_dpy->loader_extensions = swrast_loader_extensions;

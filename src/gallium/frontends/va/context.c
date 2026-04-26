@@ -430,17 +430,20 @@ vlVaCreateContext(VADriverContextP ctx, VAConfigID config_id, int picture_width,
    context->surfaces = _mesa_set_create(NULL, _mesa_hash_pointer, _mesa_key_pointer_equal);
    context->buffers = _mesa_set_create(NULL, _mesa_hash_pointer, _mesa_key_pointer_equal);
 
+   mtx_lock(&drv->mutex);
+   *context_id = handle_table_add(drv->htab, context);
+   mtx_unlock(&drv->mutex);
+
    if (create_decoder) {
       mtx_lock(&drv->mutex);
       context->decoder = drv->pipe->create_video_codec(drv->pipe, &context->templat);
       mtx_unlock(&drv->mutex);
-      if (!context->decoder)
+      if (!context->decoder) {
+         vlVaDestroyContext(ctx, *context_id);
+         *context_id = VA_INVALID_ID;
          return VA_STATUS_ERROR_ALLOCATION_FAILED;
+      }
    }
-
-   mtx_lock(&drv->mutex);
-   *context_id = handle_table_add(drv->htab, context);
-   mtx_unlock(&drv->mutex);
 
    return VA_STATUS_SUCCESS;
 }
@@ -490,53 +493,57 @@ vlVaDestroyContext(VADriverContextP ctx, VAContextID context_id)
    }
    _mesa_set_destroy(context->buffers, NULL);
 
-   if (context->decoder) {
-      if (context->desc.base.entry_point == PIPE_VIDEO_ENTRYPOINT_ENCODE) {
-         if (u_reduce_video_profile(context->decoder->profile) ==
-             PIPE_VIDEO_FORMAT_MPEG4_AVC) {
-            if (context->desc.h264enc.frame_idx)
-               _mesa_hash_table_destroy(context->desc.h264enc.frame_idx, NULL);
-            for (uint32_t i = 0; i < ARRAY_SIZE(context->desc.h264enc.dpb); i++) {
-               struct pipe_video_buffer *buf = context->desc.h264enc.dpb[i].buffer;
-               if (buf && !context->desc.h264enc.dpb[i].id)
-                  buf->destroy(buf);
-            }
-            util_dynarray_fini(&context->desc.h264enc.raw_headers);
+   bool is_encode = context->desc.base.entry_point == PIPE_VIDEO_ENTRYPOINT_ENCODE;
+   switch (u_reduce_video_profile(context->desc.base.profile)) {
+   case PIPE_VIDEO_FORMAT_MPEG4_AVC:
+      if (is_encode) {
+         if (context->desc.h264enc.frame_idx)
+            _mesa_hash_table_destroy(context->desc.h264enc.frame_idx, NULL);
+         for (uint32_t i = 0; i < ARRAY_SIZE(context->desc.h264enc.dpb); i++) {
+            struct pipe_video_buffer *buf = context->desc.h264enc.dpb[i].buffer;
+            if (buf && !context->desc.h264enc.dpb[i].id)
+               buf->destroy(buf);
          }
-         if (u_reduce_video_profile(context->decoder->profile) ==
-             PIPE_VIDEO_FORMAT_HEVC) {
-            if (context->desc.h265enc.frame_idx)
-               _mesa_hash_table_destroy(context->desc.h265enc.frame_idx, NULL);
-            for (uint32_t i = 0; i < ARRAY_SIZE(context->desc.h265enc.dpb); i++) {
-               struct pipe_video_buffer *buf = context->desc.h265enc.dpb[i].buffer;
-               if (buf && !context->desc.h265enc.dpb[i].id)
-                  buf->destroy(buf);
-            }
-            util_dynarray_fini(&context->desc.h265enc.raw_headers);
-         }
-         if (u_reduce_video_profile(context->decoder->profile) ==
-             PIPE_VIDEO_FORMAT_AV1) {
-            for (uint32_t i = 0; i < ARRAY_SIZE(context->desc.av1enc.dpb); i++) {
-               struct pipe_video_buffer *buf = context->desc.av1enc.dpb[i].buffer;
-               if (buf && !context->desc.av1enc.dpb[i].id)
-                  buf->destroy(buf);
-            }
-            util_dynarray_fini(&context->desc.av1enc.raw_headers);
-         }
+         util_dynarray_fini(&context->desc.h264enc.raw_headers);
       } else {
-         if (u_reduce_video_profile(context->decoder->profile) ==
-               PIPE_VIDEO_FORMAT_MPEG4_AVC) {
-            FREE(context->desc.h264.pps->sps);
-            FREE(context->desc.h264.pps);
-         }
-         if (u_reduce_video_profile(context->decoder->profile) ==
-               PIPE_VIDEO_FORMAT_HEVC) {
-            FREE(context->desc.h265.pps->sps);
-            FREE(context->desc.h265.pps);
-         }
+         FREE(context->desc.h264.pps->sps);
+         FREE(context->desc.h264.pps);
       }
-      context->decoder->destroy(context->decoder);
+      break;
+
+   case PIPE_VIDEO_FORMAT_HEVC:
+      if (is_encode) {
+         if (context->desc.h265enc.frame_idx)
+            _mesa_hash_table_destroy(context->desc.h265enc.frame_idx, NULL);
+         for (uint32_t i = 0; i < ARRAY_SIZE(context->desc.h265enc.dpb); i++) {
+            struct pipe_video_buffer *buf = context->desc.h265enc.dpb[i].buffer;
+            if (buf && !context->desc.h265enc.dpb[i].id)
+               buf->destroy(buf);
+         }
+         util_dynarray_fini(&context->desc.h265enc.raw_headers);
+      } else {
+         FREE(context->desc.h265.pps->sps);
+         FREE(context->desc.h265.pps);
+      }
+      break;
+
+   case PIPE_VIDEO_FORMAT_AV1:
+      if (is_encode) {
+         for (uint32_t i = 0; i < ARRAY_SIZE(context->desc.av1enc.dpb); i++) {
+            struct pipe_video_buffer *buf = context->desc.av1enc.dpb[i].buffer;
+            if (buf && !context->desc.av1enc.dpb[i].id)
+               buf->destroy(buf);
+         }
+         util_dynarray_fini(&context->desc.av1enc.raw_headers);
+      }
+      break;
+
+   default:
+      break;
    }
+
+   if (context->decoder)
+      context->decoder->destroy(context->decoder);
    if (context->deint) {
       vl_deint_filter_cleanup(context->deint);
       FREE(context->deint);

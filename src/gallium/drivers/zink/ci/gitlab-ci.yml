@@ -174,7 +174,7 @@ zink-tu-a618:
     - .lava-arm64-test-gl
     - .zink-turnip-collabora-rules
     - .zink-test
-    - .lava-sc7180-trogdor-lazor-limozeen:arm64
+    - .lava-sc7180-trogdor-kingoftown:arm64
   variables:
     DEQP_SUITE: zink-tu-a618
     FLAKES_CHANNEL: "#freedreno-ci"

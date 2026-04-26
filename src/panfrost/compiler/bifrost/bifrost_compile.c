@@ -4035,7 +4035,8 @@ bi_emit_valhall_offsets(bi_builder *b, nir_tex_instr *instr)
    /* Component 2: multisample index */
    if (ms_idx >= 0 && (!nir_src_is_const(instr->src[ms_idx].src) ||
                        nir_src_as_uint(instr->src[ms_idx].src) != 0)) {
-      dest = bi_mkvec_v2i16(b, dest, bi_src_index(&instr->src[ms_idx].src));
+      bi_index ms = bi_src_index(&instr->src[ms_idx].src);
+      dest = bi_mkvec_v2i16(b, bi_half(dest, false), bi_half(ms, false));
    }
 
    /* Component 3: 8-bit LOD */
@@ -7086,7 +7087,7 @@ find_all_predecessors(const bi_context *ctx, bi_block *b, BITSET_WORD *out)
    assert(out);
    assert(b);
 
-   BITSET_CLEAR_RANGE(out, 0, ctx->num_blocks);
+   BITSET_CLEAR_COUNT(out, 0, ctx->num_blocks);
 
    /* If the CFG was one long chain, we would require |blocks|-1 iters to
     * propagate the in_loop info all the way through.

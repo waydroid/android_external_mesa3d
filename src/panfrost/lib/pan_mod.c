@@ -407,7 +407,7 @@ pan_mod_afrc_init_slice_layout(
 
    uint64_t surf_stride_B =
       (uint64_t)slayout->tiled_or_linear.row_stride_B *
-      DIV_ROUND_UP(aligned_extent_px.height, aligned_extent_px.height);
+      (aligned_extent_px.height / tile_extent_px.height);
 
    slayout->tiled_or_linear.surface_stride_B = surf_stride_B;
    slayout->size_B =

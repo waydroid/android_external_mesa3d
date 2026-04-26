@@ -108,15 +108,19 @@ alloc_shm(struct dri_sw_displaytarget *dri_sw_dt, unsigned size)
 
    /* 0600 = user read+write */
    dri_sw_dt->shmid = shmget(IPC_PRIVATE, size, IPC_CREAT | 0600);
-   if (dri_sw_dt->shmid < 0)
+   if (dri_sw_dt->shmid < 0) {
+      dri_sw_dt->shmid = -1;
       return NULL;
+   }
 
    addr = (char *) shmat(dri_sw_dt->shmid, NULL, 0);
    /* mark the segment immediately for deletion to avoid leaks */
    shmctl(dri_sw_dt->shmid, IPC_RMID, NULL);
 
-   if (addr == (char *) -1)
+   if (addr == (char *) -1) {
+      dri_sw_dt->shmid = -1;
       return NULL;
+   }
 
    return addr;
 }

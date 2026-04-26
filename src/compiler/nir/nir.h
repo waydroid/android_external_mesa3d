@@ -5555,10 +5555,12 @@ nir_lower_shader_calls(nir_shader *shader,
 
 int nir_get_io_offset_src_number(const nir_intrinsic_instr *instr);
 int nir_get_io_index_src_number(const nir_intrinsic_instr *instr);
+int nir_get_io_data_src_number(const nir_intrinsic_instr *instr);
 int nir_get_io_arrayed_index_src_number(const nir_intrinsic_instr *instr);
 
 nir_src *nir_get_io_offset_src(nir_intrinsic_instr *instr);
 nir_src *nir_get_io_index_src(nir_intrinsic_instr *instr);
+nir_src *nir_get_io_data_src(nir_intrinsic_instr *instr);
 nir_src *nir_get_io_arrayed_index_src(nir_intrinsic_instr *instr);
 nir_src *nir_get_shader_call_payload_src(nir_intrinsic_instr *call);
 

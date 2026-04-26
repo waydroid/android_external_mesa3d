@@ -657,14 +657,26 @@ trans_store_output_fs(trans_ctx *tctx, nir_intrinsic_instr *intr, pco_ref src)
       pco_ref_new_ssa(tctx->func, pco_ref_get_bits(src), chans);
    pco_comp(&tctx->b, data_comp, addr_data, pco_ref_val16(2));
 
+   pco_ref cov_mask_ss = pco_ref_new_ssa32(tctx->func);
+   pco_savmsk(&tctx->b,
+              cov_mask_ss,
+              pco_ref_null(),
+              .savmsk_mode = PCO_SAVMSK_MODE_VM);
+
+   pco_ref cov_mask_ms = pco_ref_new_ssa32(tctx->func);
+   pco_savmsk(&tctx->b,
+              cov_mask_ms,
+              pco_ref_null(),
+              .savmsk_mode = PCO_SAVMSK_MODE_ICM);
+
    pco_ref cov_mask = pco_ref_new_ssa32(tctx->func);
-   pco_ref sample_id = pco_ref_hwreg(PCO_SR_SAMP_NUM, PCO_REG_CLASS_SPEC);
-   pco_shift(&tctx->b,
-             cov_mask,
-             pco_one,
-             sample_id,
-             pco_ref_null(),
-             .shiftop = PCO_SHIFTOP_LSL);
+   pco_csel(&tctx->b,
+            cov_mask,
+            fs_is_single_sampled(tctx),
+            cov_mask_ss,
+            cov_mask_ms,
+            .tst_op_main = PCO_TST_OP_MAIN_GZERO,
+            .tst_type_main = PCO_TST_TYPE_MAIN_U32);
 
    return pco_st_tiled(&tctx->b,
                        data_comp,

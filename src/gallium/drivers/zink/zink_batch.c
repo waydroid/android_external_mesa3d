@@ -701,6 +701,23 @@ submit_queue(void *data, void *gdata, int thread_index)
    };
    if (si[ZINK_SUBMIT_CMDBUF].waitSemaphoreCount)
       si[ZINK_SUBMIT_CMDBUF].pNext = &sem_submit;
+   {
+      VkCommandBuffer sync_cmdbuf = bs->has_work ? bs->cmdbuf :
+                                                   bs->has_reordered_work ? bs->reordered_cmdbuf :
+                                                                            bs->has_unsync ? bs->unsynchronized_cmdbuf :
+                                                                                             VK_NULL_HANDLE;
+      if (sync_cmdbuf) {
+         VkMemoryBarrier mb;
+         mb.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+         mb.pNext = NULL;
+         mb.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+         mb.dstAccessMask = VK_ACCESS_HOST_READ_BIT;
+         VKSCR(CmdPipelineBarrier)(sync_cmdbuf,
+                                   VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                   VK_PIPELINE_STAGE_HOST_BIT,
+                                   0, 1, &mb, 0, NULL, 0, NULL);
+      }
+   }
    VkCommandBuffer cmdbufs[3];
    unsigned c = 0;
    if (bs->has_unsync)

@@ -2625,6 +2625,13 @@ brw_postprocess_nir_opts(nir_shader *nir, const struct brw_compiler *compiler,
 
    brw_vectorize_lower_mem_access(nir, compiler, robust_flags);
 
+   /* Fence LSC SLM writes to avoid workgroups WaW hazards to the same SLM
+    * location.
+    */
+   if (devinfo->has_lsc &&
+       mesa_shader_stage_uses_workgroup(nir->info.stage))
+      OPT(brw_nir_fence_shared_stores);
+
    /* Do this after lowering memory access bit-sizes */
    if (nir->info.stage == MESA_SHADER_MESH ||
        nir->info.stage == MESA_SHADER_TASK) {

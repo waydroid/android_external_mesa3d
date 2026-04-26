@@ -3379,19 +3379,21 @@ static void
 apply_explicit_location(const struct ast_type_qualifier *qual,
                         ir_variable *var,
                         struct _mesa_glsl_parse_state *state,
-                        YYLTYPE *loc)
+                        YYLTYPE *loc, bool force_explict_uniform_loc_zero)
 {
    bool fail = false;
 
-   unsigned qual_location;
+   unsigned qual_location = 0;
    if (!process_qualifier_constant(state, loc, "location", qual->location,
-                                   &qual_location)) {
+                                   &qual_location) &&
+       !force_explict_uniform_loc_zero) {
       return;
    }
 
    /* Checks for GL_ARB_explicit_uniform_location. */
    if (qual->flags.q.uniform) {
-      if (!state->check_explicit_uniform_location_allowed(loc, var))
+      if (!force_explict_uniform_loc_zero &&
+          !state->check_explicit_uniform_location_allowed(loc, var))
          return;
 
       const struct gl_constants *consts = state->consts;
@@ -3919,8 +3921,13 @@ apply_layout_qualifier_to_variable(const struct ast_type_qualifier *qual,
                        qual_string);
    }
 
-   if (qual->flags.q.explicit_location) {
-      apply_explicit_location(qual, var, state, loc);
+   bool force_explict_uniform_loc_zero =
+      state->ctx->Const.ForceExplicitUniformLocZero && qual->flags.q.uniform &&
+      strcmp(state->ctx->Const.ForceExplicitUniformLocZero, var->name) == 0;
+
+   if (qual->flags.q.explicit_location || force_explict_uniform_loc_zero) {
+      apply_explicit_location(qual, var, state, loc,
+                              force_explict_uniform_loc_zero);
 
       if (qual->flags.q.explicit_component) {
          unsigned qual_component;
@@ -7667,6 +7674,7 @@ ast_process_struct_or_iface_block_members(ir_exec_list *instructions,
        * embedded structures in 1.10 only.
        */
       if (state->language_version != 110 &&
+          !state->allow_glsl_embedded_structure_declarations &&
           decl_list->type->specifier->structure != NULL)
          _mesa_glsl_error(&loc, state,
                           "embedded structure declarations are not allowed");

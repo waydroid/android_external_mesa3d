@@ -1858,7 +1858,7 @@ nir_def_components_read(const nir_def *def)
 bool
 nir_def_all_uses_are_fsat(const nir_def *def)
 {
-   nir_foreach_use(src, def) {
+   nir_foreach_use_including_if(src, def) {
       if (nir_src_is_if(src))
          return false;
 
@@ -1877,7 +1877,7 @@ nir_def_all_uses_are_fsat(const nir_def *def)
 bool
 nir_def_all_uses_ignore_sign_bit(const nir_def *def)
 {
-   nir_foreach_use(use, def) {
+   nir_foreach_use_including_if(use, def) {
       if (nir_src_is_if(use))
          return false;
       nir_instr *instr = nir_src_parent_instr(use);

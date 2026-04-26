@@ -1,6 +1,5 @@
 # Sometimes passes.
 KHR-GLES31.core.compute_shader.pipeline-compute-chain
-KHR-GLES31.core.shader_atomic_counters.advanced-usage-many-dispatches
 KHR-GLES31.core.shader_atomic_counters.advanced-usage-many-draw-calls2
 
 # Occasional "args_equal: Assertion `l.size() == r.size()' failed."

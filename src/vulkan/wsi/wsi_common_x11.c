@@ -352,29 +352,9 @@ wsi_x11_connection_create(struct wsi_device *wsi_dev,
       wsi_conn->is_proprietary_x11 = true;
 
    wsi_conn->has_mit_shm = false;
-#ifdef HAVE_X11_DRM
+#if defined(HAVE_X11_DRM) && defined(HAVE_SYS_SHM_H)
    if (wsi_conn->has_dri3 && wsi_conn->has_present && wants_shm) {
-      bool has_mit_shm = shm_reply->present != 0;
-
-      xcb_shm_query_version_cookie_t ver_cookie;
-      xcb_shm_query_version_reply_t *ver_reply;
-
-      ver_cookie = xcb_shm_query_version(conn);
-      ver_reply = xcb_shm_query_version_reply(conn, ver_cookie, NULL);
-
-      has_mit_shm = ver_reply->shared_pixmaps;
-      free(ver_reply);
-      xcb_void_cookie_t cookie;
-      xcb_generic_error_t *error;
-
-      if (has_mit_shm) {
-         cookie = xcb_shm_detach_checked(conn, 0);
-         if ((error = xcb_request_check(conn, cookie))) {
-            if (error->error_code != BadRequest)
-               wsi_conn->has_mit_shm = true;
-            free(error);
-         }
-      }
+      wsi_conn->has_mit_shm = x11_xcb_display_supports_xshm(conn);
    }
 #endif
 

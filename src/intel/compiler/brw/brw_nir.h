@@ -172,6 +172,9 @@ void brw_preprocess_nir(const struct brw_compiler *compiler,
                         nir_shader *nir,
                         const struct brw_nir_compiler_opts *opts);
 
+bool
+brw_nir_fence_shared_stores(nir_shader *shader);
+
 void
 brw_nir_link_shaders(const struct brw_compiler *compiler,
                      nir_shader *producer, nir_shader *consumer);

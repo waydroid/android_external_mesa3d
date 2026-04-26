@@ -172,11 +172,14 @@ init_ray_query_vars(nir_shader *shader, const glsl_type *opaque_type, struct ray
       dst->stack_entries = MAX_SCRATCH_STACK_ENTRY_COUNT;
    } else {
       if (radv_use_bvh_stack_rtn(pdev)) {
-         /* The hardware ds_bvh_stack_rtn address can only encode a stack base up to 8191 dwords. */
+         /* The hardware ds_bvh_stack_rtn address can only encode a stack base up to 8191 dwords, or 16383 dwords on
+          * gfx12+.
+          */
          uint32_t num_wave32_groups = workgroup_size / 32;
          uint32_t max_group_stack_base = (num_wave32_groups - 1) * 32 * shared_stack_entries;
          uint32_t max_stack_base = (shared_offset / 4) + max_group_stack_base;
-         dst->use_bvh_stack_rtn = max_stack_base < 8192;
+         uint32_t max_hw_stack_base = pdev->info.gfx_level >= GFX12 ? 16384 : 8192;
+         dst->use_bvh_stack_rtn = max_stack_base < max_hw_stack_base;
       }
       dst->shared_stack = true;
       dst->shared_base = shared_offset;
@@ -321,7 +324,6 @@ lower_rq_initialize(nir_builder *b, nir_intrinsic_instr *instr, struct ray_query
          rq_store(b, rq, trav_stack_low_watermark, addr);
       } else {
          nir_def *base_offset = nir_imul_imm(b, stack_idx, sizeof(uint32_t));
-         base_offset = nir_iadd_imm(b, base_offset, vars->shared_base);
          rq_store(b, rq, trav_stack, base_offset);
          rq_store(b, rq, trav_stack_low_watermark, base_offset);
       }
@@ -491,7 +493,7 @@ store_stack_entry(nir_builder *b, nir_def *index, nir_def *value, const struct r
    struct traversal_data *data = args->data;
 
    if (data->vars->shared_stack)
-      nir_store_shared(b, value, index, .base = 0, .align_mul = 4);
+      nir_store_shared(b, value, index, .base = data->vars->shared_base, .align_mul = 4);
    else
       nir_store_deref(b, nir_build_deref_array(b, rq_deref(b, data->rq, stack), index), value, 0x1);
 }
@@ -502,7 +504,7 @@ load_stack_entry(nir_builder *b, nir_def *index, const struct radv_ray_traversal
    struct traversal_data *data = args->data;
 
    if (data->vars->shared_stack)
-      return nir_load_shared(b, 1, 32, index, .base = 0, .align_mul = 4);
+      return nir_load_shared(b, 1, 32, index, .base = data->vars->shared_base, .align_mul = 4);
    else
       return nir_load_deref(b, nir_build_deref_array(b, rq_deref(b, data->rq, stack), index));
 }
@@ -575,16 +577,13 @@ lower_rq_proceed(nir_builder *b, nir_intrinsic_instr *instr, struct ray_query_va
       args.use_bvh_stack_rtn = vars->use_bvh_stack_rtn;
       if (args.use_bvh_stack_rtn) {
          args.stack_stride = 1;
-         args.stack_base = 0;
       } else {
          uint32_t workgroup_size =
             b->shader->info.workgroup_size[0] * b->shader->info.workgroup_size[1] * b->shader->info.workgroup_size[2];
          args.stack_stride = workgroup_size * 4;
-         args.stack_base = vars->shared_base;
       }
    } else {
       args.stack_stride = 1;
-      args.stack_base = 0;
    }
 
    rq_store(b, rq, break_flag, nir_imm_false(b));

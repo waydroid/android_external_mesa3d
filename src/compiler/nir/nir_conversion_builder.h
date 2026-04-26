@@ -24,6 +24,7 @@
 #ifndef NIR_CONVERSION_BUILDER_H
 #define NIR_CONVERSION_BUILDER_H
 
+#include "util/half_float.h"
 #include "util/u_math.h"
 #include "nir_builder.h"
 #include "nir_builtin_builder.h"
@@ -162,6 +163,29 @@ nir_round_int_to_float(nir_builder *b, nir_def *src,
       }
       UNREACHABLE("unexpected rounding mode");
    } else {
+      /* For conversions to FP16 we need to clamp the input against the fp16
+       * max value when rounding towards zero or down. The reason for that is
+       * that for integer values outside of FP16 finite value range we could
+       * get Infinity, which would be incorrect rounding in those cases.
+       *
+       * Furthermore, we only need to do the clamping for integers bigger than
+       * 32 bits, because the lowering below will already clamp 16 bit integers
+       * correctly.
+       *
+       * This isn't a problem for FP32 or FP64 floats as integers can't exceed
+       * the finite value ranges.
+       */
+      if (dest_bit_size == 16 && src->bit_size >= 32) {
+         switch (round) {
+         case nir_rounding_mode_rtz:
+         case nir_rounding_mode_rd:
+            src = nir_umin_imm(b, src, FP16_MAX_F);
+            break;
+         default:
+            break;
+         }
+      }
+
       nir_def *mantissa_bit_size = nir_imm_int(b, mantissa_bits);
       nir_def *msb = nir_imax(b, nir_ufind_msb(b, src), mantissa_bit_size);
       nir_def *bits_to_lose = nir_isub(b, msb, mantissa_bit_size);
@@ -205,11 +229,6 @@ nir_alu_type_range_contains_type_range(nir_alu_type a, nir_alu_type b)
 
    if (a_base_type == nir_type_int && b_base_type == nir_type_uint &&
        a_bit_size > b_bit_size)
-      return true;
-
-   /* 16-bit floats fit in 32-bit integers */
-   if (a_base_type == nir_type_int && a_bit_size >= 32 &&
-       b == nir_type_float16)
       return true;
 
    /* All signed or unsigned ints can fit in float or above. A uint8 can fit

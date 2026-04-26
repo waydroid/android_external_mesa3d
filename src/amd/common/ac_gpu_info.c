@@ -1096,6 +1096,13 @@ ac_query_gpu_info(int fd, void *dev_p, struct radeon_info *info,
                                  info->family == CHIP_NAVI22 ||
                                  info->family == CHIP_VANGOGH;
 
+   /* GFX12 is affected by random GPU hangs when VRS rates are exported by the
+    * last VGT stage under some conditions that are unclear. One possible
+    * workaround is to emit BOP events after every draw that exports VRS
+    * rates.
+    */
+   info->has_vrs_export_bug = info->gfx_level == GFX12;
+
    /* HW bug workaround when CS threadgroups > 256 threads and async compute
     * isn't used, i.e. only one compute job can run at a time.  If async
     * compute is possible, the threadgroup size must be limited to 256 threads

@@ -471,18 +471,24 @@ struct panfrost_bo *
 panfrost_bo_import(struct panfrost_device *dev, int fd)
 {
    struct panfrost_bo *bo;
-   ASSERTED int ret;
+   struct pan_kmod_bo *kmod_bo;
    unsigned gem_handle;
 
    pthread_mutex_lock(&dev->bo_map_lock);
-   ret = drmPrimeFDToHandle(dev->kmod.dev->fd, fd, &gem_handle);
-   assert(!ret);
+   /* Import via pan_kmod_bo_import - it handles drmPrimeFDToHandle internally */
+   kmod_bo = pan_kmod_bo_import(dev->kmod.dev, fd, 0);
+   if (!kmod_bo) {
+      pthread_mutex_unlock(&dev->bo_map_lock);
+      return NULL;
+   }
 
+   /* Look up panfrost_bo by the GEM handle from kmod_bo */
+   gem_handle = pan_kmod_bo_handle(kmod_bo);
    bo = pan_lookup_bo(dev, gem_handle);
 
    if (!bo->dev) {
       bo->dev = dev;
-      bo->kmod_bo = pan_kmod_bo_import(dev->kmod.dev, fd, 0);
+      bo->kmod_bo = kmod_bo; /* Take ownership of kmod_bo reference */
 
       struct pan_kmod_vm_op vm_op = {
          .type = PAN_KMOD_VM_OP_TYPE_MAP,
@@ -510,6 +516,12 @@ panfrost_bo_import(struct panfrost_device *dev, int fd)
       if ((dev->debug & PAN_DBG_DUMP) && panfrost_bo_mmap(bo))
          mesa_loge("failed to mmap");
    } else {
+      /* pan_kmod_bo_import already incremented kmod_bo->refcnt,
+       * but we already have a reference in bo->kmod_bo,
+       * so release this extra kmod_bo reference.
+       */
+      pan_kmod_bo_put(kmod_bo);
+
       /* bo->refcnt == 0 can happen if the BO
        * was being released but panfrost_bo_import() acquired the
        * lock before panfrost_bo_unreference(). In that case, refcnt

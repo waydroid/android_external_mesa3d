@@ -759,7 +759,14 @@ radv_CmdCopyImage2(VkCommandBuffer commandBuffer, const VkCopyImageInfo2 *pCopyI
       const enum util_format_layout format_layout = radv_format_description(dst_image->vk.format)->layout;
       for (unsigned r = 0; r < pCopyImageInfo->regionCount; r++) {
          VkExtent3D dst_extent = pCopyImageInfo->pRegions[r].extent;
-         if (src_image->vk.format != dst_image->vk.format) {
+
+         /* The Vulken spec 1.4.347 says:
+          *
+          * "VUID-VkCopyImageInfo2-srcImage-09247
+          *  If the VkFormat of each of srcImage and dstImage is a compressed image format, the
+          *  formats must have the same texel block extent"
+          */
+         if (vk_format_is_compressed(src_image->vk.format) != vk_format_is_compressed(dst_image->vk.format)) {
             dst_extent.width = dst_extent.width / vk_format_get_blockwidth(src_image->vk.format) *
                                vk_format_get_blockwidth(dst_image->vk.format);
             dst_extent.height = dst_extent.height / vk_format_get_blockheight(src_image->vk.format) *

@@ -233,9 +233,6 @@ instr_ignores_round_mode(const Instruction* instr)
    case aco_opcode::v_rndne_f64:
    case aco_opcode::v_rndne_f32:
    case aco_opcode::v_rndne_f16:
-   case aco_opcode::v_fract_f64:
-   case aco_opcode::v_fract_f32:
-   case aco_opcode::v_fract_f16:
    case aco_opcode::s_min_f32:
    case aco_opcode::s_min_f16:
    case aco_opcode::s_max_f32:

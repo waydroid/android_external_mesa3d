@@ -445,11 +445,16 @@ panthor_kmod_bo_import(struct pan_kmod_dev *dev, uint32_t handle, uint64_t size,
          goto err_free_bo;
       }
 
-      /* If the BO comes from a different subsystem, we don't allow
-       * mmap() to avoid the CPU-sync churn.
+      /* FIXME: If the BO comes from a different subsystem
+       * (args.extra_flags & DRM_PANTHOR_BO_IS_IMPORTED), we should normally
+       * add extra DMA_BUF_IOCTL_SYNC calls around CPU accesses to ensure the
+       * CPU mapping consistency, but this is something we never worried about
+       * (we've always assumed exporters were exposing uncached mappings with
+       * NOP {begin,end}_cpu_access() implementations), and it worked fine until
+       * now.
+       * The long term plan is to hook up DMA_BUF_IOCTL_SYNC, but this requires
+       * more work.
        */
-      if (args.extra_flags & DRM_PANTHOR_BO_IS_IMPORTED)
-         flags |= PAN_KMOD_BO_FLAG_NO_MMAP;
    }
 
    /* Create a unsignalled syncobj on import. Will serve as a

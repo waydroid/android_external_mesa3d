@@ -854,8 +854,6 @@ struct si_shader {
          unsigned spi_ps_input_ena;
          unsigned spi_ps_input_addr;
          unsigned spi_ps_in_control;
-         unsigned spi_shader_z_format;
-         unsigned spi_shader_col_format;
          unsigned cb_shader_mask;
          unsigned db_shader_control;
          unsigned num_interp;

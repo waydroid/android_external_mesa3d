@@ -26,6 +26,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "util/cnd_monotonic.h"
+#include "util/timespec.h"
+#include "util/u_thread.h"
 #include "vk_format.h"
 #include "vk_instance.h"
 #include "vk_physical_device.h"
@@ -100,6 +103,8 @@ struct wsi_win32_swapchain {
    IDXGISwapChain3            *dxgi;
    struct wsi_win32           *wsi;
    wsi_win32_surface          *surface;
+   mtx_t                      acquire_mutex;
+   struct u_cnd_monotonic     acquire_cond;
    uint64_t                     flip_sequence;
    VkResult                     status;
    VkExtent2D                 extent;
@@ -592,6 +597,10 @@ wsi_win32_swapchain_destroy(struct wsi_swapchain *drv_chain,
       chain->dxgi->Release();
 
    wsi_swapchain_finish(&chain->base);
+
+   u_cnd_monotonic_destroy(&chain->acquire_cond);
+   mtx_destroy(&chain->acquire_mutex);
+
    vk_free(allocator, chain);
    return VK_SUCCESS;
 }
@@ -604,6 +613,21 @@ wsi_win32_get_wsi_image(struct wsi_swapchain *drv_chain,
       (struct wsi_win32_swapchain *) drv_chain;
 
    return &chain->images[image_index].base;
+}
+
+static void
+wsi_win32_set_image_idle(struct wsi_win32_swapchain *chain,
+                         struct wsi_win32_image *image)
+{
+   if (!chain->dxgi)
+      mtx_lock(&chain->acquire_mutex);
+
+   image->state = WSI_IMAGE_IDLE;
+
+   if (!chain->dxgi) {
+      u_cnd_monotonic_broadcast(&chain->acquire_cond);
+      mtx_unlock(&chain->acquire_mutex);
+   }
 }
 
 static VkResult
@@ -620,12 +644,63 @@ wsi_win32_release_images(struct wsi_swapchain *drv_chain,
       uint32_t index = indices[i];
       assert(index < chain->base.image_count);
       assert(chain->images[index].state == WSI_IMAGE_DRAWING);
-      chain->images[index].state = WSI_IMAGE_IDLE;
+      wsi_win32_set_image_idle(chain, &chain->images[index]);
    }
 
    return VK_SUCCESS;
 }
 
+static bool
+wsi_win32_find_idle_image(struct wsi_win32_swapchain *chain,
+                          uint32_t *out_image_index)
+{
+   for (uint32_t i = 0; i < chain->base.image_count; i++) {
+      if (chain->images[i].state == WSI_IMAGE_IDLE) {
+         *out_image_index = i;
+         chain->images[i].state = WSI_IMAGE_DRAWING;
+         return true;
+      }
+   }
+   return false;
+}
+
+static VkResult
+wsi_win32_acquire_idle_cpu_image_locked(struct wsi_win32_swapchain *chain,
+                                        const VkAcquireNextImageInfoKHR *info,
+                                        uint32_t *out_image_index)
+{
+   if (wsi_win32_find_idle_image(chain, out_image_index))
+      return VK_SUCCESS;
+
+   if (info->timeout == 0)
+      return VK_NOT_READY;
+
+   const uint64_t abs_timeout = os_time_get_absolute_timeout(info->timeout);
+   struct timespec abs_timespec;
+   timespec_from_nsec(&abs_timespec, abs_timeout);
+   do {
+      int ret = u_cnd_monotonic_timedwait(
+         &chain->acquire_cond, &chain->acquire_mutex, &abs_timespec);
+      if (ret == thrd_timedout)
+         return VK_TIMEOUT;
+      else if (ret != thrd_success)
+         return VK_ERROR_OUT_OF_DATE_KHR;
+   } while (!wsi_win32_find_idle_image(chain, out_image_index));
+
+   return VK_SUCCESS;
+}
+
+static inline VkResult
+wsi_win32_acquire_idle_cpu_image(struct wsi_win32_swapchain *chain,
+                                 const VkAcquireNextImageInfoKHR *info,
+                                 uint32_t *out_image_index)
+{
+   mtx_lock(&chain->acquire_mutex);
+   VkResult result = wsi_win32_acquire_idle_cpu_image_locked(chain, info,
+                                                             out_image_index);
+   mtx_unlock(&chain->acquire_mutex);
+   return result;
+}
 
 static VkResult
 wsi_win32_acquire_next_image(struct wsi_swapchain *drv_chain,
@@ -639,13 +714,12 @@ wsi_win32_acquire_next_image(struct wsi_swapchain *drv_chain,
    if (chain->status != VK_SUCCESS)
       return chain->status;
 
-   for (uint32_t i = 0; i < chain->base.image_count; i++) {
-      if (chain->images[i].state == WSI_IMAGE_IDLE) {
-         *image_index = i;
-         chain->images[i].state = WSI_IMAGE_DRAWING;
-         return VK_SUCCESS;
-      }
-   }
+   /* acquire timeout has to be explicitly handled for sw wsi */
+   if (!chain->dxgi)
+      return wsi_win32_acquire_idle_cpu_image(chain, info, image_index);
+
+   if (wsi_win32_find_idle_image(chain, image_index))
+      return VK_SUCCESS;
 
    assert(chain->dxgi);
    uint32_t index = chain->dxgi->GetCurrentBackBufferIndex();
@@ -735,7 +809,7 @@ wsi_win32_queue_present(struct wsi_swapchain *drv_chain,
    if (!StretchBlt(chain->chain_dc, 0, 0, chain->extent.width, chain->extent.height, image->sw.dc, 0, 0, chain->extent.width, chain->extent.height, SRCCOPY))
       chain->status = VK_ERROR_MEMORY_MAP_FAILED;
 
-   image->state = WSI_IMAGE_IDLE;
+   wsi_win32_set_image_idle(chain, image);
 
    return chain->status;
 }
@@ -839,6 +913,19 @@ wsi_win32_surface_create_swapchain(
    if (chain == NULL)
       return VK_ERROR_OUT_OF_HOST_MEMORY;
 
+   int ret = mtx_init(&chain->acquire_mutex, mtx_plain);
+   if (ret != thrd_success) {
+      vk_free(allocator, chain);
+      return VK_ERROR_OUT_OF_HOST_MEMORY;
+   }
+
+   ret = u_cnd_monotonic_init(&chain->acquire_cond);
+   if (ret != thrd_success) {
+      mtx_destroy(&chain->acquire_mutex);
+      vk_free(allocator, chain);
+      return VK_ERROR_OUT_OF_HOST_MEMORY;
+   }
+
    struct wsi_dxgi_image_params dxgi_image_params = {
       { WSI_IMAGE_TYPE_DXGI },
    };
@@ -858,6 +945,8 @@ wsi_win32_surface_create_swapchain(
                                         create_info, image_params,
                                         allocator);
    if (result != VK_SUCCESS) {
+      u_cnd_monotonic_destroy(&chain->acquire_cond);
+      mtx_destroy(&chain->acquire_mutex);
       vk_free(allocator, chain);
       return result;
    }

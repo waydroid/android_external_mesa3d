@@ -751,11 +751,20 @@ llvmpipe_resource_from_handle(struct pipe_screen *_screen,
    assert(lpr->base.height0 == height);
 #endif
 
-   unsigned nblocksy = util_format_get_nblocksy(template->format, align(template->height0, LP_RASTER_BLOCK_SIZE));
-   if (whandle->type == WINSYS_HANDLE_TYPE_UNBACKED && whandle->image_stride)
-      lpr->img_stride[0] = whandle->image_stride;
-   else
+   if (whandle->type == WINSYS_HANDLE_TYPE_UNBACKED) {
+      if (whandle->image_stride) {
+         lpr->img_stride[0] = whandle->image_stride;
+      } else {
+         unsigned nblocksy = util_format_get_nblocksy(template->format,
+                                                      template->height0);
+         lpr->img_stride[0] = whandle->stride * nblocksy;
+      }
+   } else {
+      unsigned nblocksy = util_format_get_nblocksy(template->format,
+                                                   align(template->height0,
+                                                         LP_RASTER_BLOCK_SIZE));
       lpr->img_stride[0] = whandle->stride * nblocksy;
+   }
    lpr->sample_stride = lpr->img_stride[0];
    lpr->size_required = lpr->sample_stride;
 

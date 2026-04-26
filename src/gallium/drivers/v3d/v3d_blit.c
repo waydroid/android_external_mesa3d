@@ -470,6 +470,16 @@ v3d_tlb_blit_fast(struct pipe_context *pctx, struct pipe_blit_info *info)
         if (sinternal_type != rinternal_type)
                 return;
 
+        /* If the blit destination uses a different RT format the channel
+         * layout won't match and we would corrupt the data (e.g. storing
+         * 10-10-10-2 channels as 16-16).
+         */
+        if (v3d_get_rt_format(devinfo, spsurf->format) !=
+            v3d_get_rt_format(devinfo, dbuf.format)) {
+                pipe_resource_reference(&dbuf.texture, NULL);
+                return;
+        }
+
         MESA_TRACE_FUNC();
 
         /* If we had any other jobs writing to the blit dst we should submit

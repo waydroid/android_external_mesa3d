@@ -49,11 +49,6 @@
  */
 #define PVR_GLOBAL_FREE_LIST_GROW_THRESHOLD 13U
 
-/* Amount of padding required for VkBuffers to ensure we don't read beyond
- * a page boundary.
- */
-#define PVR_BUFFER_MEMORY_PADDING_SIZE 4
-
 /* Default size in bytes used by pvr_CreateDevice() for setting up the
  * suballoc_general, suballoc_pds and suballoc_usc suballocators.
  *

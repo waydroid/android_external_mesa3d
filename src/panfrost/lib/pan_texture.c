@@ -1345,7 +1345,7 @@ GENX(pan_buffer_texture_emit)(const struct pan_buffer_view *bview,
       cfg.type = MALI_ATTRIBUTE_TYPE_1D;
       cfg.pointer = bview->base;
       cfg.stride = stride;
-      cfg.size = bview->width_el * stride;
+      cfg.size = bview->width_el * stride + bview->offset;
    }
 
    pan_pack(out_attrib, ATTRIBUTE, cfg) {

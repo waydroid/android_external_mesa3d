@@ -2706,7 +2706,13 @@ vtn_handle_variables(struct vtn_builder *b, SpvOp opcode,
       const bool untyped = opcode == SpvOpUntypedVariableKHR;
 
       struct vtn_type *ptr_type = vtn_get_type(b, w[1]);
-      struct vtn_type *data_type = untyped ? vtn_get_type(b, w[4]) : ptr_type->pointed;
+      struct vtn_type *data_type =
+         untyped && count > 4 ? vtn_get_type(b, w[4]) : ptr_type->pointed;
+      if (data_type == NULL) {
+         data_type = vtn_zalloc(b, struct vtn_type);
+         data_type->base_type = vtn_base_type_void;
+         data_type->type = glsl_void_type();
+      }
 
       SpvStorageClass storage_class = w[3];
 

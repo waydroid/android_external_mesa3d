@@ -759,6 +759,7 @@ error_va_map:
    ac_drm_bo_free(ws->dev, buf_handle);
 
 error_bo_alloc:
+   ac_drm_va_range_free(va_handle);
    free(ranges);
 
 error_va_alloc:

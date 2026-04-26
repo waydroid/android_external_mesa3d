@@ -2409,43 +2409,6 @@ elk_fs_visitor::opt_algebraic()
             inst->predicate_inverse = false;
             inst->conditional_mod = ELK_CONDITIONAL_NONE;
             progress = true;
-         } else if (inst->saturate && inst->src[1].file == IMM) {
-            switch (inst->conditional_mod) {
-            case ELK_CONDITIONAL_LE:
-            case ELK_CONDITIONAL_L:
-               switch (inst->src[1].type) {
-               case ELK_REGISTER_TYPE_F:
-                  if (inst->src[1].f >= 1.0f) {
-                     inst->opcode = ELK_OPCODE_MOV;
-                     inst->sources = 1;
-                     inst->src[1] = reg_undef;
-                     inst->conditional_mod = ELK_CONDITIONAL_NONE;
-                     progress = true;
-                  }
-                  break;
-               default:
-                  break;
-               }
-               break;
-            case ELK_CONDITIONAL_GE:
-            case ELK_CONDITIONAL_G:
-               switch (inst->src[1].type) {
-               case ELK_REGISTER_TYPE_F:
-                  if (inst->src[1].f <= 0.0f) {
-                     inst->opcode = ELK_OPCODE_MOV;
-                     inst->sources = 1;
-                     inst->src[1] = reg_undef;
-                     inst->conditional_mod = ELK_CONDITIONAL_NONE;
-                     progress = true;
-                  }
-                  break;
-               default:
-                  break;
-               }
-               break;
-            default:
-               break;
-            }
          }
          break;
       case ELK_OPCODE_MAD:

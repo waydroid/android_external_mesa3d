@@ -1684,12 +1684,27 @@ cross_validate_globals(void *mem_ctx, const struct gl_constants *consts,
                      existing->data.mode == nir_var_mem_ssbo &&
                      existing->data.from_ssbo_unsized_array &&
                      glsl_get_gl_type(var->type) == glsl_get_gl_type(existing->type))) {
-                  linker_error(prog, "%s `%s' declared as type "
-                                 "`%s' and type `%s'\n",
-                                 gl_nir_mode_string(var),
-                                 var->name, glsl_get_type_name(var->type),
-                                 glsl_get_type_name(existing->type));
-                  return;
+
+                  /* Relax precision matching on unused uniforms for early ES shaders */
+                  if (prog->IsES && !var->interface_type &&
+                      !(existing->data.used && var->data.used) &&
+                      glsl_base_type_is_integer(glsl_get_gl_type(var->type)) == glsl_base_type_is_integer(glsl_get_gl_type(existing->type)) &&
+                      glsl_base_type_is_float(glsl_get_gl_type(var->type)) == glsl_base_type_is_float(glsl_get_gl_type(existing->type)) &&
+                      prog->GLSL_Version < 300) {
+                     linker_warning(prog, "%s `%s' declared as type "
+                                    "`%s' and type `%s'\n",
+                                    gl_nir_mode_string(var),
+                                    var->name, glsl_get_type_name(var->type),
+                                    glsl_get_type_name(existing->type));
+
+                  } else {
+                     linker_error(prog, "%s `%s' declared as type "
+                                    "`%s' and type `%s'\n",
+                                    gl_nir_mode_string(var),
+                                    var->name, glsl_get_type_name(var->type),
+                                    glsl_get_type_name(existing->type));
+                     return;
+                  }
                }
             }
          }

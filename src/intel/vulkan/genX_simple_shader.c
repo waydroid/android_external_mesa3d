@@ -390,7 +390,9 @@ genX(emit_simpler_shader_init_fragment)(struct anv_simple_shader *state)
                                            ANV_CMD_DIRTY_XFB_ENABLE |
                                            ANV_CMD_DIRTY_OCCLUSION_QUERY_ACTIVE |
                                            ANV_CMD_DIRTY_INDEX_TYPE);
-   state->cmd_buffer->state.push_constants_dirty |= VK_SHADER_STAGE_FRAGMENT_BIT;
+   /* We're reprogramming push constants and also
+    * Wa_22011440098/Wa_18022330953 force us to reprogram */
+   state->cmd_buffer->state.push_constants_dirty |= VK_SHADER_STAGE_ALL_GRAPHICS;
    state->cmd_buffer->state.gfx.push_constant_stages = VK_SHADER_STAGE_FRAGMENT_BIT;
 }
 

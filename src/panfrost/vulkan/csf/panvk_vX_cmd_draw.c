@@ -3622,12 +3622,16 @@ issue_fragment_jobs(struct panvk_cmd_buffer *cmdbuf)
           * indirect mode */
          cs_set_state_imm32(b, MALI_CS_SET_STATE_TYPE_SB_SEL_DEFERRED,
                             SB_ID(DEFERRED_FLUSH));
+#else
+         async = cs_defer(SB_WAIT_ITER(sb_upd_ctx.cur_sb), SB_ID(DEFERRED_FLUSH));
 #endif
          cs_flush_caches(b, MALI_CS_FLUSH_MODE_CLEAN, MALI_CS_FLUSH_MODE_CLEAN,
                          MALI_CS_OTHER_FLUSH_MODE_NONE, flush_id, async);
 #if PAN_ARCH >= 11
          cs_set_state_imm32(b, MALI_CS_SET_STATE_TYPE_SB_SEL_DEFERRED,
                             SB_ID(DEFERRED_SYNC));
+#else
+         async = cs_defer(SB_WAIT_ITER(sb_upd_ctx.cur_sb), SB_ID(DEFERRED_SYNC));
 #endif
 
          cs_load64_to(b, oq_chain, cs_subqueue_ctx_reg(b),

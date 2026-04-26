@@ -677,6 +677,14 @@ glsl_type_is_e5m2(const glsl_type *t)
 }
 
 static inline bool
+glsl_type_is_nonnative_float(const glsl_type *t)
+{
+   return t->base_type == GLSL_TYPE_BFLOAT16 ||
+          t->base_type == GLSL_TYPE_FLOAT_E4M3FN ||
+          t->base_type == GLSL_TYPE_FLOAT_E5M2;
+}
+
+static inline bool
 glsl_type_is_int_16_32_64(const glsl_type *t)
 {
    return t->base_type == GLSL_TYPE_INT16 ||

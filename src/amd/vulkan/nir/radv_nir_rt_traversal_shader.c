@@ -1251,7 +1251,6 @@ radv_build_traversal(struct radv_device *device, struct radv_ray_tracing_pipelin
       .vars = trav_vars_args,
       .stack_stride = stack_stride,
       .stack_entries = MAX_STACK_ENTRY_COUNT,
-      .stack_base = 0,
       .ignore_cull_mask = params->ignore_cull_mask,
       .set_flags = info ? info->set_flags : 0,
       .unset_flags = info ? info->unset_flags : 0,

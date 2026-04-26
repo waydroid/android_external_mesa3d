@@ -135,10 +135,9 @@ struct radv_ray_traversal_args {
    struct radv_ray_traversal_vars vars;
 
    /* The increment/decrement used for radv_ray_traversal_vars::stack, and how many entries are
-    * available. stack_base is the base address of the stack. */
+    * available. */
    uint32_t stack_stride;
    uint32_t stack_entries;
-   uint32_t stack_base;
 
    uint32_t set_flags;
    uint32_t unset_flags;

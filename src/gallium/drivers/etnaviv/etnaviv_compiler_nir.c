@@ -1327,7 +1327,7 @@ etna_compile_shader(struct etna_shader_variant *v)
    NIR_PASS(_, s, nir_opt_dce);
    NIR_PASS(_, s, nir_opt_cse);
 
-   NIR_PASS(_, s, nir_lower_bool_to_bitsize);
+   NIR_PASS(_, s, nir_lower_bool_to_int32);
    NIR_PASS(_, s, etna_lower_alu, c->specs->has_new_transcendentals);
 
    /* needs to be the last pass that touches pass_flags! */

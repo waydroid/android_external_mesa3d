@@ -413,10 +413,12 @@ lp_build_add(struct lp_build_context *bld,
    assert(lp_check_value(type, a));
    assert(lp_check_value(type, b));
 
-   if (a == bld->zero)
-      return b;
-   if (b == bld->zero)
-      return a;
+   if (!type.floating || !type.signed_zero_preserve) {
+      if (a == bld->zero)
+         return b;
+      if (b == bld->zero)
+         return a;
+   }
    if (a == bld->undef || b == bld->undef)
       return bld->undef;
 

@@ -85,6 +85,7 @@ anv_shader_deserialize(struct vk_device *vk_device,
    blob_copy_bytes(blob, data.bind_map.push_ranges, sizeof(data.bind_map.push_ranges));
    blob_copy_bytes(blob, data.bind_map.dynamic_descriptors,
                    sizeof(data.bind_map.dynamic_descriptors));
+   data.bind_map.inferred_behavior = blob_read_uint8(blob);
 
    if (blob->overrun)
       return vk_error(device, VK_ERROR_UNKNOWN);
@@ -163,6 +164,7 @@ anv_shader_serialize(struct vk_device *device,
                     sizeof(shader->bind_map.push_ranges));
    blob_write_bytes(blob, shader->bind_map.dynamic_descriptors,
                     sizeof(shader->bind_map.dynamic_descriptors));
+   blob_write_uint8(blob, shader->bind_map.inferred_behavior);
 
    return !blob->out_of_memory;
 }
@@ -517,33 +519,57 @@ anv_shader_set_relocs(struct anv_device *device,
    return rv_count;
 }
 
+struct anv_shader_reloc {
+   struct anv_device *device;
+   const VkAllocationCallbacks *alloc;
+   const void *in_code;
+   uint32_t *code_size;
+
+   void *relocated_code;
+};
+
 static VkResult
-anv_shader_reloc(struct anv_device *device,
-                 void *code,
-                 struct anv_shader *shader,
-                 const VkAllocationCallbacks *pAllocator)
+anv_shader_reloc_begin(struct anv_shader_reloc *reloc,
+                       struct anv_device *device,
+                       const void *in_code,
+                       struct anv_shader *shader,
+                       const VkAllocationCallbacks *alloc)
 {
+   memset(reloc, 0, sizeof(*reloc));
+   reloc->device = device;
+   reloc->alloc = alloc;
+
    const uint32_t max_relocs =
       BRW_SHADER_RELOC_EMBEDDED_SAMPLER_HANDLE +
       shader->bind_map.embedded_sampler_count;
-   uint32_t rv_count;
-   struct intel_shader_reloc_value *reloc_values =
-      vk_zalloc2(&device->vk.alloc, pAllocator,
-                 sizeof(struct intel_shader_reloc_value) * max_relocs, 8,
-                 VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
-   if (reloc_values == NULL)
+   VK_MULTIALLOC(ma);
+   VK_MULTIALLOC_DECL_SIZE(&ma, void, code, shader->prog_data->program_size);
+   VK_MULTIALLOC_DECL(&ma, struct intel_shader_reloc_value, reloc_values, max_relocs);
+
+   if (!vk_multialloc_zalloc2(&ma, &device->vk.alloc, alloc,
+                              VK_SYSTEM_ALLOCATION_SCOPE_DEVICE))
       return vk_error(device, VK_ERROR_OUT_OF_HOST_MEMORY);
 
-   rv_count = anv_shader_set_relocs(device, reloc_values, shader);
+   /* Make a copy of the code to relocate it, we don't know where the data
+    * comes from, could be read-only, could app-managed, ...
+    */
+   reloc->relocated_code = code;
+   memcpy(reloc->relocated_code, in_code, shader->prog_data->program_size);
+
+   uint32_t rv_count = anv_shader_set_relocs(device, reloc_values, shader);
    assert(rv_count <= max_relocs);
 
    brw_write_shader_relocs(&device->physical->compiler->isa,
-                           code, shader->prog_data,
+                           reloc->relocated_code, shader->prog_data,
                            reloc_values, rv_count);
 
-   vk_free2(&device->vk.alloc, pAllocator, reloc_values);
-
    return VK_SUCCESS;
+}
+
+static void
+anv_shader_reloc_end(struct anv_shader_reloc *reloc)
+{
+   vk_free2(&reloc->device->vk.alloc, reloc->alloc, reloc->relocated_code);
 }
 
 struct internal_representation {
@@ -679,13 +705,18 @@ anv_shader_create(struct anv_device *device,
 
    shader->instance_multiplier = shader_data->instance_multiplier;
 
-   result = anv_shader_reloc(device, shader_data->code, shader, pAllocator);
+   struct anv_shader_reloc reloc;
+   result = anv_shader_reloc_begin(&reloc, device, shader_data->code,
+                                   shader, pAllocator);
    if (result != VK_SUCCESS)
       goto error_state;
 
    anv_shader_heap_upload(&device->shader_heap,
-                          shader->kernel, shader_data->code,
+                          shader->kernel,
+                          reloc.relocated_code,
                           shader_data->prog_data.base.program_size);
+
+   anv_shader_reloc_end(&reloc);
 
    if (mesa_shader_stage_is_rt(shader->vk.stage)) {
       const struct brw_bs_prog_data *bs_prog_data =

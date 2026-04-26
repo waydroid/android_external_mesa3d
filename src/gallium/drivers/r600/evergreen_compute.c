@@ -350,12 +350,6 @@ static void compute_emit_cs(struct r600_context *rctx,
 	}
 	r600_update_driver_const_buffers(rctx, true);
 
-	evergreen_emit_atomic_buffer_setup(rctx, true, combined_atomics, global_atomic_count);
-	if (global_atomic_count) {
-		radeon_emit(cs, PKT3(PKT3_EVENT_WRITE, 0, 0));
-		radeon_emit(cs, EVENT_TYPE(EVENT_TYPE_CS_PARTIAL_FLUSH) | EVENT_INDEX(4));
-	}
-
 	/* Initialize all the compute-related registers.
 	 *
 	 * See evergreen_init_atom_start_compute_cs() in this file for the list
@@ -374,6 +368,12 @@ static void compute_emit_cs(struct r600_context *rctx,
 
 	rctx->b.flags |= R600_CONTEXT_WAIT_3D_IDLE | R600_CONTEXT_FLUSH_AND_INV;
 	r600_flush_emit(rctx);
+
+	evergreen_emit_atomic_buffer_setup(rctx, true, combined_atomics, global_atomic_count);
+	if (global_atomic_count) {
+		radeon_emit(cs, PKT3(PKT3_EVENT_WRITE, 0, 0));
+		radeon_emit(cs, EVENT_TYPE(EVENT_TYPE_CS_PARTIAL_FLUSH) | EVENT_INDEX(4));
+	}
 
 	uint32_t rat_mask;
 

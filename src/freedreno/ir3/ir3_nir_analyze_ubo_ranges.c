@@ -218,6 +218,7 @@ handle_partial_const(nir_builder *b, nir_def **srcp, int *offp)
       return;
 
    nir_alu_instr *alu = nir_def_as_alu((*srcp));
+   assert(alu->def.num_components == 1);
 
    if (alu->op == nir_op_imad24_ir3) {
       /* This case is slightly more complicated as we need to
@@ -238,9 +239,9 @@ handle_partial_const(nir_builder *b, nir_def **srcp, int *offp)
 
    if (nir_src_is_const(alu->src[0].src)) {
       *offp += nir_src_as_uint(alu->src[0].src);
-      *srcp = alu->src[1].src.ssa;
+      *srcp = nir_mov_alu(b, alu->src[1], 1);
    } else if (nir_src_is_const(alu->src[1].src)) {
-      *srcp = alu->src[0].src.ssa;
+      *srcp = nir_mov_alu(b, alu->src[0], 1);
       *offp += nir_src_as_uint(alu->src[1].src);
    }
 }

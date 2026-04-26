@@ -112,6 +112,25 @@ st_nir_lookup_parameter_index(struct gl_program *prog, nir_variable *var)
    return -1;
 }
 
+void
+st_update_state_param_locations(struct gl_context *ctx,
+                                struct gl_program *prog, nir_shader *nir)
+{
+   nir_foreach_variable_with_modes(uniform, nir, nir_var_uniform) {
+      if (uniform->state_slots) {
+         const gl_state_index16 *const stateTokens = uniform->state_slots[0].tokens;
+
+         int loc = _mesa_lookup_state_param_idx(prog->Parameters, stateTokens);
+         assert(loc >= 0);
+         if (ctx->Const.PackedDriverUniformStorage) {
+            uniform->data.driver_location =
+               prog->Parameters->Parameters[loc].ValueOffset;
+         } else
+            uniform->data.driver_location = loc;
+      }
+   }
+}
+
 static void
 st_nir_assign_uniform_locations(struct st_context *st,
                                 struct gl_program *prog,
@@ -135,35 +154,8 @@ st_nir_assign_uniform_locations(struct st_context *st,
             imageidx += type_size(uniform->type);
          }
       } else if (uniform->state_slots) {
-         const gl_state_index16 *const stateTokens = uniform->state_slots[0].tokens;
-         if (st->allow_st_finalize_nir_twice) {
-            /* Make sure the variant has the correct locations set */
-            loc = _mesa_lookup_state_param_idx(prog->Parameters, stateTokens);
-            if (loc >= 0) {
-               if (ctx->Const.PackedDriverUniformStorage) {
-                  uniform->data.driver_location =
-                     prog->Parameters->Parameters[loc].ValueOffset;
-               } else
-                  uniform->data.driver_location = loc;
-            }
-
-            continue;
-         }
-
-         unsigned comps;
-         if (glsl_type_is_struct_or_ifc(type)) {
-            comps = 4;
-         } else {
-            comps = glsl_get_vector_elements(type);
-         }
-
-         if (ctx->Const.PackedDriverUniformStorage) {
-            loc = _mesa_add_sized_state_reference(prog->Parameters,
-                                                  stateTokens, comps, false);
-            loc = prog->Parameters->Parameters[loc].ValueOffset;
-         } else {
-            loc = _mesa_add_state_reference(prog->Parameters, stateTokens);
-         }
+         /* State vars should have been handled already */
+         continue;
       } else {
          loc = st_nir_lookup_parameter_index(prog, uniform);
 
@@ -374,6 +366,7 @@ st_glsl_to_nir_post_opts(struct st_context *st, struct gl_program *prog,
 
    st_set_prog_affected_state_flags(prog);
    nir_shader_gather_info(nir, nir_shader_get_entrypoint(nir));
+   st_update_state_param_locations(st->ctx, prog, nir);
 
    if (st->allow_st_finalize_nir_twice) {
       st_serialize_base_nir(prog, nir);

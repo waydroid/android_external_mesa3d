@@ -329,6 +329,8 @@ _mesa_glsl_parse_state::_mesa_glsl_parse_state(struct gl_context *_ctx,
       ctx->Const.AllowVertexTextureBias;
    this->allow_glsl_120_subset_in_110 =
       ctx->Const.AllowGLSL120SubsetIn110;
+   this->allow_glsl_embedded_structure_declarations =
+      ctx->Const.AllowGLSLEmbeddedStructureDeclarations;
    this->allow_builtin_variable_redeclaration =
       ctx->Const.AllowGLSLBuiltinVariableRedeclaration;
    this->ignore_write_to_readonly_var =

@@ -1703,6 +1703,17 @@ spirv_builder_const_float(struct spirv_builder *b, int width, double val)
 }
 
 SpvId
+spirv_builder_const_null(struct spirv_builder *b, SpvId result_type)
+{
+   SpvId result = spirv_builder_new_id(b);
+   spirv_buffer_prepare(&b->types_const_defs, b->mem_ctx, 3);
+   spirv_buffer_emit_word(&b->types_const_defs, SpvOpConstantNull | (3 << 16));
+   spirv_buffer_emit_word(&b->types_const_defs, result_type);
+   spirv_buffer_emit_word(&b->types_const_defs, result);
+   return result;
+}
+
+SpvId
 spirv_builder_const_composite(struct spirv_builder *b, SpvId result_type,
                               const SpvId constituents[],
                               size_t num_constituents)

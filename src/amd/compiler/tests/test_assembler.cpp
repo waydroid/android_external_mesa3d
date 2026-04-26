@@ -298,6 +298,10 @@ BEGIN_TEST(assembler.long_jump.constaddr)
    if (!setup_cs(NULL, (amd_gfx_level)GFX10))
       return;
 
+   //! llvm_version: #llvm_ver
+   fprintf(output, "llvm_version: %u\n", LLVM_VERSION_MAJOR);
+   //; funcs['lit'] = lambda v: 'lit(%s)' % hex(int(v)) if llvm_ver >= 22 else v
+
    //>> s_branch 16369                                              ; bf823ff1
    bld.sopp(aco_opcode::s_branch, 2);
 
@@ -309,7 +313,7 @@ BEGIN_TEST(assembler.long_jump.constaddr)
    bld.reset(program->create_and_insert_block());
 
    //>> s_getpc_b64 s[0:1]                                          ; be801f00
-   //! s_add_u32 s0, s0, 32                                         ; 8000ff00 00000020
+   //! s_add_u32 s0, s0, @lit(32)                                   ; 8000ff00 00000020
    bld.sop1(aco_opcode::p_constaddr_getpc, Definition(PhysReg(0), s2), Operand::zero());
    bld.sop2(aco_opcode::p_constaddr_addlo, Definition(PhysReg(0), s1), bld.def(s1, scc),
             Operand(PhysReg(0), s1), Operand::zero(), Operand::zero());
@@ -424,12 +428,16 @@ BEGIN_TEST(assembler.p_constaddr)
    dst0.setFixed(PhysReg(0));
    dst1.setFixed(PhysReg(2));
 
+   //! llvm_version: #llvm_ver
+   fprintf(output, "llvm_version: %u\n", LLVM_VERSION_MAJOR);
+   //; funcs['lit'] = lambda v: 'lit(%s)' % hex(int(v)) if llvm_ver >= 22 else v
+
    //>> s_getpc_b64 s[0:1] ; be801c00
-   //! s_add_u32 s0, s0, 44 ; 8000ff00 0000002c
+   //! s_add_u32 s0, s0, @lit(44) ; 8000ff00 0000002c
    bld.pseudo(aco_opcode::p_constaddr, dst0, bld.def(s1, scc), Operand::zero());
 
    //! s_getpc_b64 s[2:3] ; be821c00
-   //! s_add_u32 s2, s2, 64 ; 8002ff02 00000040
+   //! s_add_u32 s2, s2, @lit(64) ; 8002ff02 00000040
    bld.pseudo(aco_opcode::p_constaddr, dst1, bld.def(s1, scc), Operand::c32(32));
 
    aco::lower_to_hw_instr(program.get());
@@ -1056,20 +1064,23 @@ BEGIN_TEST(assembler.exp)
       Operand op_m0(bld.tmp(s1));
       op_m0.setFixed(m0);
 
-      //~gfx11>> exp mrt3 v1, v0, v3, v2                                     ; f800003f 02030001
-      //~gfx12>> export mrt3 v1, v0, v3, v2                                  ; f800003f 02030001
+      //! mrt3: @match_func(mrt3)
+      fprintf(output, "mrt3: mrt3%s\n", LLVM_VERSION_MAJOR >= 23 ? "," : "");
+
+      //~gfx11>> exp @mrt3 v1, v0, v3, v2                                   ; f800003f 02030001
+      //~gfx12>> export @mrt3 v1, v0, v3, v2                                ; f800003f 02030001
       bld.exp(aco_opcode::exp, op[1], op[0], op[3], op[2], 0xf, 3);
 
-      //~gfx11! exp mrt3 v1, off, v0, off                                   ; f8000035 80008001
-      //~gfx12! export mrt3 v1, off, v0, off                                ; f8000035 80008001
+      //~gfx11! exp @mrt3 v1, off, v0, off                                  ; f8000035 80008001
+      //~gfx12! export @mrt3 v1, off, v0, off                               ; f8000035 80008001
       bld.exp(aco_opcode::exp, op[1], Operand(v1), op[0], Operand(v1), 0x5, 3);
 
-      //~gfx11! exp mrt3 v1, v0, v3, v2 done                                ; f800083f 02030001
-      //~gfx12! export mrt3 v1, v0, v3, v2 done                             ; f800083f 02030001
+      //~gfx11! exp @mrt3 v1, v0, v3, v2 done                               ; f800083f 02030001
+      //~gfx12! export @mrt3 v1, v0, v3, v2 done                            ; f800083f 02030001
       bld.exp(aco_opcode::exp, op[1], op[0], op[3], op[2], 0xf, 3, false, true);
 
-      //~gfx11! exp mrt3 v1, v0, v3, v2 row_en                              ; f800203f 02030001
-      //~gfx12! export mrt3 v1, v0, v3, v2 row_en                           ; f800203f 02030001
+      //~gfx11! exp @mrt3 v1, v0, v3, v2 row_en                             ; f800203f 02030001
+      //~gfx12! export @mrt3 v1, v0, v3, v2 row_en                          ; f800203f 02030001
       bld.exp(aco_opcode::exp, op[1], op[0], op[3], op[2], op_m0, 0xf, 3)->exp().row_en = true;
 
       finish_assembler_test();

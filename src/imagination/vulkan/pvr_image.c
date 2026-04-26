@@ -84,14 +84,9 @@ static void pvr_image_init_physical_extent(struct pvr_image *image,
       assert(image->memlayout == PVR_MEMLAYOUT_LINEAR);
       image->physical_extent = image->vk.extent;
 
-      /* If the image is being rendered to (written by the PBE) make sure the
-       * width is aligned correctly.
-       */
-      if (image->vk.usage & (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                             VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
-         image->physical_extent.width =
-            align(image->physical_extent.width, pbe_stride_align);
-      }
+      /* Align the image for being rendered to (written by the PBE). */
+      image->physical_extent.width =
+         align(image->physical_extent.width, pbe_stride_align);
    }
 }
 

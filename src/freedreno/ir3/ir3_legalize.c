@@ -1456,6 +1456,11 @@ prede_sched(struct ir3 *ir)
       list_delinit(&succ0_terminator->node);
       struct ir3_builder build = ir3_builder_at(ir3_before_terminator(succ0));
       struct ir3_instruction *prede = ir3_PREDE(&build);
+
+      /* legalize_block might have set sync flags on the terminator that we just
+       * removed; set them on prede instead.
+       */
+      prede->flags |= succ0_terminator->flags;
       add_predication_workaround(ir->compiler, NULL, prede);
       remove_unused_block(succ1);
       block->successors[1] = succ0->successors[0];

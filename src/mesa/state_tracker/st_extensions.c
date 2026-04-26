@@ -1341,6 +1341,7 @@ void st_init_extensions(struct pipe_screen *screen,
 
    consts->ForceIntegerTexNearest = options->force_integer_tex_nearest;
 
+   consts->ForceExplicitUniformLocZero = options->force_explicit_uniform_loc_zero;
    consts->VendorOverride = options->force_gl_vendor;
    consts->RendererOverride = options->force_gl_renderer;
 
@@ -1550,6 +1551,9 @@ void st_init_extensions(struct pipe_screen *screen,
 
    if (options->allow_glsl_120_subset_in_110)
       consts->AllowGLSL120SubsetIn110 = GL_TRUE;
+
+   if (options->allow_glsl_embedded_structure_declarations)
+      consts->AllowGLSLEmbeddedStructureDeclarations = GL_TRUE;
 
    if (options->allow_glsl_builtin_const_expression)
       consts->AllowGLSLBuiltinConstantExpression = GL_TRUE;

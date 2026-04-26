@@ -647,6 +647,7 @@ destructive_merge_instructions(struct rc_pair_instruction *rgb, struct rc_pair_i
    rgb->Alpha.Opcode = alpha->Alpha.Opcode;
    rgb->Alpha.DestIndex = alpha->Alpha.DestIndex;
    rgb->Alpha.WriteMask = alpha->Alpha.WriteMask;
+   rgb->Alpha.Target = alpha->Alpha.Target;
    rgb->Alpha.OutputWriteMask = alpha->Alpha.OutputWriteMask;
    rgb->Alpha.DepthWriteMask = alpha->Alpha.DepthWriteMask;
    rgb->Alpha.Saturate = alpha->Alpha.Saturate;

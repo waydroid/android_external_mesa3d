@@ -24,8 +24,6 @@ spec@khr_texture_compression_astc@sliced-3d-miptree-gles srgb-fp@sRGB decode ful
 spec@!opengl 1.0@rasterpos,Fail
 spec@!opengl 1.0@rasterpos@glsl_vs_gs_linked,Fail
 spec@!opengl 1.0@rasterpos@glsl_vs_tes_linked,Fail
-# This is caused by lowering mediump before linking:
-spec@glsl-es-1.00@linker@glsl-mismatched-uniform-precision-unused,Fail
 
 # See Khronos issue 5587: the test expects one-dimensional (array) texture to work while
 # it's explicitely marked as non-supported by EXT_sparse_texture2.

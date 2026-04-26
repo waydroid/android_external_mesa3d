@@ -531,7 +531,6 @@ nak_nir_lower_system_value_intrin(nir_builder *b, nir_intrinsic_instr *intrin,
    }
 
    case nir_intrinsic_load_subgroup_invocation:
-   case nir_intrinsic_load_helper_invocation:
    case nir_intrinsic_load_invocation_id:
    case nir_intrinsic_load_workgroup_id: {
       const gl_system_value sysval =
@@ -602,8 +601,8 @@ nak_nir_lower_system_value_intrin(nir_builder *b, nir_intrinsic_instr *intrin,
       }
       break;
 
-   case nir_intrinsic_is_helper_invocation: {
-      /* Unlike load_helper_invocation, this one isn't re-orderable */
+   case nir_intrinsic_is_helper_invocation:
+   case nir_intrinsic_load_helper_invocation: {
       val = nak_nir_load_sysval(b, NAK_SV_THREAD_KILL, 0);
       break;
    }

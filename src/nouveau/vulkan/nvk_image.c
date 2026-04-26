@@ -1650,7 +1650,7 @@ nvk_BindImageMemory2(VkDevice device,
       const VkBindMemoryStatusKHR *status =
          vk_find_struct_const(pBindInfos[i].pNext, BIND_MEMORY_STATUS_KHR);
       if (status != NULL && status->pResult != NULL)
-         *status->pResult = VK_SUCCESS;
+         *status->pResult = result;
 
       if (first_error_or_success == VK_SUCCESS)
          first_error_or_success = result;

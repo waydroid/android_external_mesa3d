@@ -593,7 +593,7 @@ tu_bo_init(struct tu_device *dev,
       if (!new_ptr) {
          dev->submit_bo_count--;
          mtx_unlock(&dev->bo_mutex);
-         vdrm_bo_close(dev->vdev->vdrm, bo->gem_handle);
+         vdrm_bo_close(dev->vdev->vdrm, gem_handle);
          return VK_ERROR_OUT_OF_HOST_MEMORY;
       }
 
@@ -753,6 +753,8 @@ virtio_bo_init(struct tu_device *dev,
    }
 
    *out_bo = bo;
+   if (lazy_vma)
+      lazy_vma->msm.backs_lazy_bo = true;
 
    /* We don't use bo->name here because for the !TU_DEBUG=bo case bo->name is NULL. */
    tu_bo_set_kernel_name(dev, bo, name);
@@ -773,9 +775,11 @@ virtio_bo_init(struct tu_device *dev,
    return VK_SUCCESS;
 
 fail:
-   mtx_lock(&dev->vma_mutex);
-   util_vma_heap_free(&dev->vma, req.iova, size);
-   mtx_unlock(&dev->vma_mutex);
+   if (!lazy_vma) {
+      mtx_lock(&dev->vma_mutex);
+      util_vma_heap_free(&dev->vma, req.iova, size);
+      mtx_unlock(&dev->vma_mutex);
+   }
    return result;
 }
 
@@ -818,7 +822,7 @@ virtio_bo_init_dmabuf(struct tu_device *dev,
 
    res_id = vdrm_handle_to_res_id(vdrm, handle);
    if (!res_id) {
-      /* XXX gem_handle potentially leaked here since no refcnt */
+      vdrm_bo_close(vdrm, handle);
       result = vk_error(dev, VK_ERROR_INVALID_EXTERNAL_HANDLE);
       goto out_unlock;
    }
@@ -840,20 +844,21 @@ virtio_bo_init_dmabuf(struct tu_device *dev,
                                                   TU_BO_ALLOC_DMABUF, &iova);
    mtx_unlock(&dev->vma_mutex);
    if (result != VK_SUCCESS) {
-      vdrm_bo_close(dev->vdev->vdrm, handle);
+      vdrm_bo_close(vdrm, handle);
       goto out_unlock;
    }
 
    result =
       tu_bo_init(dev, NULL, bo, handle, size, iova, TU_BO_ALLOC_NO_FLAGS, "dmabuf");
    if (result != VK_SUCCESS) {
+      mtx_lock(&dev->vma_mutex);
       util_vma_heap_free(&dev->vma, iova, size);
+      mtx_unlock(&dev->vma_mutex);
       memset(bo, 0, sizeof(*bo));
    } else {
       *out_bo = bo;
+      set_iova(dev, bo->res_id, iova);
    }
-
-   set_iova(dev, bo->res_id, iova);
 
 out_unlock:
    u_rwlock_wrunlock(&dev->dma_bo_lock);
@@ -946,9 +951,14 @@ static void
 virtio_sparse_vma_finish(struct tu_device *dev,
                          struct tu_sparse_vma *vma)
 {
-   mtx_lock(&dev->vma_mutex);
-   util_vma_heap_free(&dev->vma, vma->msm.iova, vma->msm.size);
-   mtx_unlock(&dev->vma_mutex);
+   /* For has_set_iova, if a lazy BO was mapped into this sparse VMA
+    * the allocation will be handed off to the zombie VMA mechanism.
+    */
+   if (!vma->msm.backs_lazy_bo) {
+      mtx_lock(&dev->vma_mutex);
+      util_vma_heap_free(&dev->vma, vma->msm.iova, vma->msm.size);
+      mtx_unlock(&dev->vma_mutex);
+   }
 }
 
 static VkResult

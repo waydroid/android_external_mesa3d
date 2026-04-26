@@ -918,13 +918,12 @@ bi_coalesce_tied(bi_context *ctx)
       bi_builder b = bi_init_builder(ctx, bi_before_instr(I));
       unsigned n = bi_count_read_registers(I, 0);
 
+      bi_index dst = I->dest[0], src = I->src[0];
+      assert(dst.offset == 0);
       for (unsigned i = 0; i < n; ++i) {
-         bi_index dst = I->dest[0], src = I->src[0];
-
-         assert(dst.offset == 0 && src.offset == 0);
-         dst.offset = src.offset = i;
-
          bi_mov_i32_to(&b, dst, src);
+         dst.offset++;
+         src.offset++;
       }
 
       bi_replace_src(I, 0, I->dest[0]);

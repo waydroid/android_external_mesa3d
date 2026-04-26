@@ -787,7 +787,7 @@ GENX(pan_emit_afrc_color_attachment)(const struct pan_fb_info *fb,
       pan_afrc_get_format_info(image->props.format);
    uint64_t base, row_stride, surf_stride;
 
-   get_tiled_or_linear_att_mem_props(pan_image_view_get_s_plane(iview),
+   get_tiled_or_linear_att_mem_props(pref,
                                      iview->first_level, layer_or_z_slice,
                                      &base, &row_stride, &surf_stride);
 
@@ -800,6 +800,7 @@ GENX(pan_emit_afrc_color_attachment)(const struct pan_fb_info *fb,
       cfg.afrc_format = pan_afrc_format(finfo, image->props.modifier, 0);
       get_rt_formats(iview->format, &cfg.writeback_format, &cfg.internal_format,
                      &cfg.swizzle);
+      cfg.srgb = util_format_is_srgb(iview->format);
       cfg.writeback_buffer.base = base;
       cfg.writeback_buffer.row_stride = row_stride;
       cfg.writeback_buffer.surface_stride = surf_stride;

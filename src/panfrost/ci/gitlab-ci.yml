@@ -94,7 +94,7 @@ panfrost-g52-vk:arm64:
     FDO_CI_CONCURRENT: 6  # We get OOMkills if we go too wide since VKCTS 1.4.4.0
     MESA_VK_IGNORE_CONFORMANCE_WARNING: 1
     PAN_I_WANT_A_BROKEN_VULKAN_DRIVER: 1
-    PANVK_DEBUG: "no_known_warn,sync,coherent_before_cached"
+    PANVK_DEBUG: "sync,coherent_before_cached"
     DEQP_SUITE: panfrost-g52-vk
     HWCI_START_WESTON: 1
 
@@ -179,7 +179,7 @@ panfrost-g610-vk:arm64:
   variables:
     DRIVER_NAME: panvk
     MESA_VK_IGNORE_CONFORMANCE_WARNING: 1
-    PANVK_DEBUG: "no_known_warn,sync,cs,coherent_before_cached"
+    PANVK_DEBUG: "sync,cs,coherent_before_cached"
     DEQP_SUITE: panfrost-g610-vk
     DEQP_FRACTION: 3
     HWCI_START_WESTON: 1
@@ -197,7 +197,7 @@ panfrost-g610-vk-asan:arm64:
     DRIVER_NAME: panvk
     FDO_CI_CONCURRENT: 2 # We get OOMkills if we go too wide with asan enabled
     MESA_VK_IGNORE_CONFORMANCE_WARNING: 1
-    PANVK_DEBUG: "no_known_warn,sync,cs,coherent_before_cached"
+    PANVK_DEBUG: "sync,cs,coherent_before_cached"
     DEQP_SUITE: panfrost-g610-vk-asan
     LAVA_TAGS: at-least-8gb
 
@@ -211,7 +211,7 @@ panfrost-g925-vk:arm64:
   variables:
     DRIVER_NAME: panvk
     MESA_VK_IGNORE_CONFORMANCE_WARNING: 1
-    PANVK_DEBUG: "no_known_warn,sync,cs,coherent_before_cached"
+    PANVK_DEBUG: "sync,cs,coherent_before_cached"
     DEQP_SUITE: panfrost-g925-vk
     HWCI_START_WESTON: 1
 

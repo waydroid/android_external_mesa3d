@@ -1206,8 +1206,8 @@ zink_init_screen_caps(struct zink_screen *screen)
    caps->mesh.max_mesh_output_vertices = screen->info.mesh_props.maxMeshOutputVertices;
    caps->mesh.max_mesh_output_primitives = screen->info.mesh_props.maxMeshOutputPrimitives;
    caps->mesh.max_mesh_output_components = screen->info.mesh_props.maxMeshOutputComponents;
-   caps->mesh.max_mesh_output_layers = screen->info.mesh_props.maxMeshOutputLayers;
-   caps->mesh.max_mesh_multiview_view_count = screen->info.mesh_props.maxMeshMultiviewViewCount;
+   caps->mesh.max_mesh_output_layers = MAX2(screen->info.mesh_props.maxMeshOutputLayers, 1);
+   caps->mesh.max_mesh_multiview_view_count = MAX2(screen->info.mesh_props.maxMeshMultiviewViewCount, 1);
    caps->mesh.mesh_output_per_vertex_granularity = screen->info.mesh_props.meshOutputPerVertexGranularity;
    caps->mesh.mesh_output_per_primitive_granularity = screen->info.mesh_props.meshOutputPerPrimitiveGranularity;
 
@@ -1299,7 +1299,7 @@ zink_is_format_supported(struct pipe_screen *pscreen,
    }
 
    /* always use superset to determine feature support */
-   VkFormat vkformat = zink_get_format(screen, PIPE_FORMAT_A8_UNORM ? zink_format_get_emulated_alpha(format) : format);
+   VkFormat vkformat = zink_get_format(screen, format == PIPE_FORMAT_A8_UNORM ? zink_format_get_emulated_alpha(format) : format);
    if (vkformat == VK_FORMAT_UNDEFINED)
       return false;
 

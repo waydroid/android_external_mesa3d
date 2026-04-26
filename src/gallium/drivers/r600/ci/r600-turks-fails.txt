@@ -15,7 +15,6 @@ KHR-GLES31.core.gpu_shader5.texture_gather_offset_color_clamp_to_edge,Fail
 
 KHR-GLES31.core.layout_binding.image2D_layout_binding_imageLoad_ComputeShader,Fail
 
-KHR-GLES31.core.shader_atomic_counters.advanced-usage-many-dispatches,Fail
 KHR-GLES31.core.shader_atomic_counters.advanced-usage-many-draw-calls2,Fail
 KHR-GLES31.core.shader_atomic_counters.advanced-usage-multi-stage,Fail
 

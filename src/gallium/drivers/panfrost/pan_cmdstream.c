@@ -227,6 +227,14 @@ panfrost_create_sampler_state(struct pipe_context *pctx,
       cfg.border_color_a = so->base.border_color.ui[3];
 
 #if PAN_ARCH >= 6
+      /*
+       * Disabling round_to_nearest_even for NEAREST filters ensures proper
+       * floor() behavior as required by OpenCL_C spec section 8.2.
+       */
+      if (cso->mag_img_filter == PIPE_TEX_FILTER_NEAREST &&
+          cso->min_img_filter == PIPE_TEX_FILTER_NEAREST)
+         cfg.round_to_nearest_even = false;
+
       if (cso->max_anisotropy > 1) {
          cfg.maximum_anisotropy = cso->max_anisotropy;
          cfg.lod_algorithm = MALI_LOD_ALGORITHM_ANISOTROPIC;
@@ -2089,7 +2097,7 @@ emit_image_bufs(struct panfrost_batch *batch, mesa_shader_stage shader,
 
       panfrost_track_image_access(batch, shader, image);
 
-#if MALI_ARCH >= 6
+#if PAN_ARCH >= 6
       if (is_buffer) {
          pan_pack(bufs + (i * 2), ATTRIBUTE_BUFFER, cfg) {
             cfg.type = MALI_ATTRIBUTE_TYPE_1D;
@@ -2110,7 +2118,7 @@ emit_image_bufs(struct panfrost_batch *batch, mesa_shader_stage shader,
             is_buffer ? 0 : image->u.tex.level);
       }
 
-#if MALI_ARCH <= 5
+#if PAN_ARCH <= 5
       if (is_buffer) {
          pan_cast_and_pack(&bufs[(i * 2) + 1], ATTRIBUTE_BUFFER_CONTINUATION_3D,
                            cfg) {
@@ -2223,18 +2231,18 @@ panfrost_emit_image_texbuf_attribs(struct panfrost_batch *batch,
    emit_image_bufs(batch, type, bufs.cpu, image_mask);
 
 #if PAN_ARCH >= 6
+   struct mali_attribute_packed *attr_array = attribs.cpu;
+   struct mali_attribute_buffer_packed *attrib_bufs = bufs.cpu;
    /* Texel buffers come after the images, which require two buffers per image. */
    unsigned image_buf_offset = image_count * 2;
-   emit_texbuf_attribs(ctx, type, attribs.cpu + image_count, image_buf_offset);
-   emit_texbuf_bufs(ctx, type, bufs.cpu + image_buf_offset);
+   emit_texbuf_attribs(ctx, type, attr_array + image_count, image_buf_offset);
+   emit_texbuf_bufs(ctx, type, attrib_bufs + image_buf_offset);
 
    /* We need an empty attrib buf to stop the prefetching on Bifrost */
-   struct mali_attribute_buffer_packed *attrib_bufs = bufs.cpu;
    pan_pack(&attrib_bufs[buf_count - 1], ATTRIBUTE_BUFFER, cfg)
       ;
 
    /* Ensure any shader read attributes that are not bound behave properly */
-   struct mali_attribute_packed *attr_array = attribs.cpu;
    for (unsigned i = bound_attrib_count; i < attrib_array_size; ++i) {
       pan_pack(&attr_array[i], ATTRIBUTE, cfg)
          cfg.format = MALI_PACK_FMT(CONSTANT, 0000, L);

@@ -1289,7 +1289,7 @@ void si_init_screen_caps(struct si_screen *sscreen)
    caps->max_texture_mb = sscreen->info.max_heap_size_kb / 1024 / 4;
 
    caps->prefer_back_buffer_reuse = false;
-   caps->uma = false;
+   caps->uma = !sscreen->info.has_dedicated_vram;
    caps->prefer_imm_arrays_as_constbuf = false;
 
    caps->performance_monitor =

@@ -40,11 +40,13 @@
 #include <vulkan/vulkan_core.h>
 #include <vulkan/vulkan_xcb.h>
 #include "util/u_debug.h"
+#include "util/log.h"
 #include "kopper_interface.h"
 #include "loader_dri_helper.h"
 #include "dri_util.h"
 #include "mesa/glapi/glapi/glapi.h"
 #include "dispatch.h"
+#include "x11_display.h"
 
 static int xshm_error = 0;
 static int xshm_opcode = -1;
@@ -582,44 +584,6 @@ drisw_copy_sub_buffer(__GLXDRIdrawable * pdraw,
 }
 
 static int
-check_xshm(Display *dpy)
-{
-   xcb_connection_t *c = XGetXCBConnection(dpy);
-   xcb_void_cookie_t cookie;
-   xcb_generic_error_t *error;
-   int ret = True;
-   xcb_query_extension_cookie_t shm_cookie;
-   xcb_query_extension_reply_t *shm_reply;
-
-   shm_cookie = xcb_query_extension(c, 7, "MIT-SHM");
-   shm_reply = xcb_query_extension_reply(c, shm_cookie, NULL);
-
-   if (shm_reply) {
-      bool has_mit_shm = shm_reply->present;
-
-      if (has_mit_shm)
-         xshm_opcode = shm_reply->major_opcode;
-
-      free(shm_reply);
-
-      if (!has_mit_shm)
-         return False;
-   }
-
-   cookie = xcb_shm_detach_checked(c, 0);
-   if ((error = xcb_request_check(c, cookie))) {
-      /* BadRequest means we're a remote client. If we were local we'd
-       * expect BadValue since 'info' has an invalid segment name.
-       */
-      if (error->error_code == BadRequest)
-         ret = False;
-      free(error);
-   }
-
-   return ret;
-}
-
-static int
 driswKopperSetSwapInterval(__GLXDRIdrawable *pdraw, int interval)
 {
    struct drisw_drawable *pdp = (struct drisw_drawable *) pdraw;
@@ -677,8 +641,10 @@ driswCreateScreen(int screen, struct glx_display *priv, enum glx_driver glx_driv
 
    if (glx_driver)
       loader_extensions_local = kopper_extensions_noshm;
-   else if (!check_xshm(priv->dpy))
+#ifdef HAVE_SYS_SHM_H
+   else if (!x11_xcb_display_supports_xshm(XGetXCBConnection(priv->dpy)))
       loader_extensions_local = loader_extensions_noshm;
+#endif
    else
       loader_extensions_local = loader_extensions_shm;
    priv->driver = glx_driver ? GLX_DRIVER_ZINK_YES : GLX_DRIVER_SW;

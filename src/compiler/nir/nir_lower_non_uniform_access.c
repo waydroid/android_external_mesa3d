@@ -29,7 +29,6 @@
 
 struct nu_handle {
    nir_def *handle;
-   nir_deref_instr *parent_deref;
    nir_def *first;
 };
 
@@ -81,7 +80,6 @@ nu_handle_init(struct nu_handle *h, nir_src *src)
          return false;
 
       h->handle = deref->arr.index.ssa;
-      h->parent_deref = parent;
 
       return true;
    } else {
@@ -89,7 +87,6 @@ nu_handle_init(struct nu_handle *h, nir_src *src)
          return false;
 
       h->handle = src->ssa;
-      h->parent_deref = NULL;
 
       return true;
    }
@@ -123,11 +120,15 @@ nu_handle_compare(const nir_lower_non_uniform_access_options *options,
 static void
 nu_handle_rewrite(nir_builder *b, struct nu_handle *h, nir_src *src)
 {
-   if (h->parent_deref) {
+   if (nir_src_is_deref(*src)) {
+      nir_deref_instr *deref = nir_src_as_deref(*src);
+      assert(deref->deref_type == nir_deref_type_array);
+      nir_deref_instr *parent = nir_deref_instr_parent(deref);
+
       /* Replicate the deref. */
-      nir_deref_instr *deref =
-         nir_build_deref_array(b, h->parent_deref, h->first);
-      nir_src_rewrite(src, &deref->def);
+      nir_deref_instr *new_deref =
+         nir_build_deref_array(b, parent, h->first);
+      nir_src_rewrite(src, &new_deref->def);
    } else {
       nir_src_rewrite(src, h->first);
    }

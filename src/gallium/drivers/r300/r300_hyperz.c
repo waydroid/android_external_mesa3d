@@ -106,6 +106,10 @@ static bool r300_hiz_allowed(struct r300_context *r300)
         /* if depth func is NOTEQUAL */
         if (dsa->dsa.depth_func == PIPE_FUNC_NOTEQUAL)
             return false;
+
+        /* R5xx docs advise avoiding HiZ with ALWAYS comparisons. */
+        if (dsa->dsa.depth_func == PIPE_FUNC_ALWAYS)
+            return false;
     }
     return true;
 }

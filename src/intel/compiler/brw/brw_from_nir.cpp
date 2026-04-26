@@ -598,6 +598,9 @@ optimize_frontfacing_ternary(nir_to_brw_state &ntb,
    const intel_device_info *devinfo = ntb.devinfo;
    brw_shader &s = ntb.s;
 
+   if (instr->def.bit_size != 32)
+      return false;
+
    nir_intrinsic_instr *src0 = nir_src_as_intrinsic(instr->src[0].src);
    if (src0 == NULL || src0->intrinsic != nir_intrinsic_load_front_face)
       return false;
@@ -874,9 +877,9 @@ try_emit_b2fi_of_inot(nir_to_brw_state &ntb, const brw_builder &bld,
 }
 
 static bool
-is_const_zero(const nir_src &src)
+is_const_zero(const nir_alu_src &src)
 {
-   return nir_src_is_const(src) && nir_src_as_int(src) == 0;
+   return nir_src_is_const(src.src) && nir_alu_src_as_uint(src) == 0;
 }
 
 static void
@@ -1639,7 +1642,7 @@ brw_from_nir_emit_alu(nir_to_brw_state &ntb, nir_alu_instr *instr,
        * either 0 or src0. Replacing the 0 with another value can eliminate a
        * temporary register.
        */
-      if (is_const_zero(instr->src[2].src))
+      if (is_const_zero(instr->src[2]))
          bld.BFI2(result, op[0], op[1], op[0]);
       else
          bld.BFI2(result, op[0], op[1], op[2]);

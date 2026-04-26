@@ -604,11 +604,18 @@ d3d12_resource_from_handle(struct pipe_screen *pscreen,
    if (res->bo) {
       d3d12_res = res->bo->res;
    } else if (handle->type == WINSYS_HANDLE_TYPE_D3D12_RES) {
+#ifdef _GAMING_XBOX
       if (handle->modifier == 1) {
          d3d12_heap = (ID3D12Heap *) handle->com_obj;
       } else {
          d3d12_res = (ID3D12Resource *) handle->com_obj;
       }
+#else
+      IUnknown *obj = (IUnknown *) handle->com_obj;
+      (void)obj->QueryInterface(&d3d12_res);
+      (void)obj->QueryInterface(&d3d12_heap);
+      obj->Release();
+#endif
    } else {
       screen->dev->OpenSharedHandle(d3d_handle, IID_PPV_ARGS(&d3d12_res));
    }
@@ -1070,12 +1077,17 @@ d3d12_memobj_create_from_handle(struct pipe_screen *pscreen, struct winsys_handl
    }
    memobj->base.dedicated = dedicated;
 
+#ifdef _GAMING_XBOX
    obj->AddRef();
    if (handle->modifier == 1) {
       memobj->heap = (ID3D12Heap *) obj;
    } else {
       memobj->res = (ID3D12Resource *) obj;
    }
+#else
+   (void)obj->QueryInterface(&memobj->heap);
+   (void)obj->QueryInterface(&memobj->res);
+#endif
 
    obj->Release();
    if (!memobj->res && !memobj->heap) {
@@ -1123,7 +1135,9 @@ d3d12_resource_from_memobj(struct pipe_screen *pscreen,
 
    whandle.offset = static_cast<unsigned int>(offset);
    whandle.format = templ->format;
+#ifdef _GAMING_XBOX
    whandle.modifier = memobj->res ? 0 : 1;
+#endif
 
    // WINSYS_HANDLE_TYPE_D3D12_RES implies taking ownership of the reference
    ((IUnknown *)whandle.com_obj)->AddRef();

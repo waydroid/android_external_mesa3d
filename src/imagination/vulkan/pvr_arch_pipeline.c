@@ -1390,8 +1390,7 @@ static void pvr_graphics_pipeline_setup_vertex_dma(
       /* Used by later on by the driver to figure out if the buffer is being
        * accessed out of bounds, for robust buffer access.
        */
-      dma_desc->component_size_in_bytes =
-         fmt_description->block.bits / fmt_description->nr_channels / 8;
+      dma_desc->attrib_size_in_bytes = fmt_description->block.bits / 8;
 
       ++*dma_count;
    }
@@ -2114,6 +2113,9 @@ pvr_init_fs_input_attachments_mrt(pco_data *data,
       VkFormat vk_format = rp->color_attachment_formats[u];
       bool has_stencil = vk_format_has_stencil(vk_format);
 
+      if (vk_format == VK_FORMAT_UNDEFINED)
+         continue;
+
       fs->ia_formats[u] = vk_format_to_pipe_format(vk_format);
       assert(fs->ia_formats[u] != PIPE_FORMAT_NONE);
       if (has_stencil)
@@ -2743,18 +2745,53 @@ pvr_graphics_pipeline_compile(struct pvr_device *const device,
       &gfx_pipeline->shader_state.vertex;
    struct pvr_fragment_shader_state *fragment_state =
       &gfx_pipeline->shader_state.fragment;
-
    struct usc_mrt_setup mrt_setup = { 0 };
 
    if (!pCreateInfo->renderPass) {
       const struct vk_render_pass_state *rp = state->rp;
+      VkFormat attachment_formats[rp->color_attachment_count];
+      uint32_t mrt_attachment_map[rp->color_attachment_count];
+      struct usc_mrt_setup mrt_setup_tmp = { 0 };
+      uint32_t mrt_count = 0;
+
+      for (uint32_t i = 0; i < rp->color_attachment_count; i++) {
+         if (rp->color_attachment_formats[i] == VK_FORMAT_UNDEFINED) {
+            mrt_attachment_map[i] = VK_ATTACHMENT_UNUSED;
+            attachment_formats[mrt_count] = VK_FORMAT_UNDEFINED;
+            continue;
+         }
+
+         mrt_attachment_map[i] = mrt_count;
+         attachment_formats[mrt_count++] = rp->color_attachment_formats[i];
+      }
 
       result = pvr_arch_init_usc_mrt_setup(device,
-                                           rp->color_attachment_count,
-                                           rp->color_attachment_formats,
-                                           &mrt_setup);
+                                           mrt_count,
+                                           attachment_formats,
+                                           &mrt_setup_tmp);
       if (result != VK_SUCCESS)
          return result;
+
+      result =
+         pvr_arch_mrt_setup_partial_init(device,
+                                         &mrt_setup,
+                                         rp->color_attachment_count,
+                                         mrt_setup_tmp.num_output_regs,
+                                         mrt_setup_tmp.num_tile_buffers);
+      if (result != VK_SUCCESS) {
+         pvr_arch_destroy_mrt_setup(device, &mrt_setup_tmp);
+         return result;
+      }
+
+      for (uint32_t i = 0; i < rp->color_attachment_count; i++) {
+         if (mrt_attachment_map[i] != VK_ATTACHMENT_UNUSED) {
+            memcpy(&mrt_setup.mrt_resources[i],
+                   &mrt_setup_tmp.mrt_resources[mrt_attachment_map[i]],
+                   sizeof(mrt_setup_tmp.mrt_resources[0]));
+         }
+      }
+
+      pvr_arch_destroy_mrt_setup(device, &mrt_setup_tmp);
    }
 
    pco_ctx *pco_ctx = device->pdevice->pco_ctx;

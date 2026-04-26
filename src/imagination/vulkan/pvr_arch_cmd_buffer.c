@@ -4039,37 +4039,6 @@ pvr_can_pbe_resolve_ds_attachment(const struct pvr_device_info *dev_info,
    return pvr_arch_format_is_pbe_downscalable(dev_info, vk_format);
 }
 
-static inline VkResult
-pvr_mrt_setup_partial_init(struct pvr_device *const device,
-                           struct usc_mrt_setup *mrt_setup,
-                           uint32_t num_renger_targets,
-                           uint32_t num_output_regs,
-                           uint32_t num_tile_buffers)
-{
-   struct usc_mrt_resource *mrt_resources = NULL;
-
-   if (num_renger_targets) {
-      const uint32_t size =
-         num_renger_targets * sizeof(*mrt_setup->mrt_resources);
-
-      mrt_resources = vk_zalloc(&device->vk.alloc,
-                                size,
-                                8,
-                                VK_SYSTEM_ALLOCATION_SCOPE_OBJECT);
-      if (!mrt_resources)
-         return VK_ERROR_OUT_OF_HOST_MEMORY;
-   }
-
-   *mrt_setup = (struct usc_mrt_setup){
-      .num_render_targets = num_renger_targets,
-      .num_output_regs = num_output_regs,
-      .num_tile_buffers = num_tile_buffers,
-      .mrt_resources = mrt_resources,
-   };
-
-   return VK_SUCCESS;
-}
-
 static void pvr_dynamic_rendering_output_attachments_cleanup(
    const struct pvr_device *device,
    const VkAllocationCallbacks *const allocator,
@@ -4290,11 +4259,12 @@ static VkResult pvr_dynamic_rendering_output_attachments_setup(
    dr_info->hw_render.tile_buffers_count = mrt_setup.num_tile_buffers;
    dr_info->hw_render.output_regs_count = mrt_setup.num_output_regs;
 
-   result = pvr_mrt_setup_partial_init(cmd_buffer->device,
-                                       dr_info->mrt_setup,
-                                       pRenderingInfo->colorAttachmentCount,
-                                       dr_info->hw_render.output_regs_count,
-                                       dr_info->hw_render.tile_buffers_count);
+   result =
+      pvr_arch_mrt_setup_partial_init(cmd_buffer->device,
+                                      dr_info->mrt_setup,
+                                      pRenderingInfo->colorAttachmentCount,
+                                      dr_info->hw_render.output_regs_count,
+                                      dr_info->hw_render.tile_buffers_count);
    if (result != VK_SUCCESS) {
       pvr_arch_destroy_mrt_setup(device, &mrt_setup);
       vk_command_buffer_set_error(&cmd_buffer->vk, result);
@@ -4314,22 +4284,24 @@ static VkResult pvr_dynamic_rendering_output_attachments_setup(
       }
    }
 
-   result = pvr_mrt_setup_partial_init(cmd_buffer->device,
-                                       &dr_info->hw_render.init_setup,
-                                       dr_info->hw_render.color_init_count,
-                                       dr_info->hw_render.output_regs_count,
-                                       dr_info->hw_render.tile_buffers_count);
+   result =
+      pvr_arch_mrt_setup_partial_init(cmd_buffer->device,
+                                      &dr_info->hw_render.init_setup,
+                                      dr_info->hw_render.color_init_count,
+                                      dr_info->hw_render.output_regs_count,
+                                      dr_info->hw_render.tile_buffers_count);
    if (result != VK_SUCCESS) {
       pvr_arch_destroy_mrt_setup(device, &mrt_setup);
       vk_command_buffer_set_error(&cmd_buffer->vk, result);
       goto err_finish_mrt_setup;
    }
 
-   result = pvr_mrt_setup_partial_init(cmd_buffer->device,
-                                       &dr_info->hw_render.eot_setup,
-                                       eot_mrt_count,
-                                       dr_info->hw_render.output_regs_count,
-                                       dr_info->hw_render.tile_buffers_count);
+   result =
+      pvr_arch_mrt_setup_partial_init(cmd_buffer->device,
+                                      &dr_info->hw_render.eot_setup,
+                                      eot_mrt_count,
+                                      dr_info->hw_render.output_regs_count,
+                                      dr_info->hw_render.tile_buffers_count);
    if (result != VK_SUCCESS) {
       pvr_arch_destroy_mrt_setup(device, &mrt_setup);
       vk_command_buffer_set_error(&cmd_buffer->vk, result);
@@ -5049,11 +5021,12 @@ static void pvr_cmd_buffer_state_from_dynamic_inheritance(
       goto err_free_attachments;
    }
 
-   result = pvr_mrt_setup_partial_init(cmd_buffer->device,
-                                       dr_info->mrt_setup,
-                                       inheritance_info->colorAttachmentCount,
-                                       mrt_setup.num_output_regs,
-                                       mrt_setup.num_tile_buffers);
+   result =
+      pvr_arch_mrt_setup_partial_init(cmd_buffer->device,
+                                      dr_info->mrt_setup,
+                                      inheritance_info->colorAttachmentCount,
+                                      mrt_setup.num_output_regs,
+                                      mrt_setup.num_tile_buffers);
    if (result != VK_SUCCESS) {
       pvr_arch_destroy_mrt_setup(device, &mrt_setup);
       vk_command_buffer_set_error(&cmd_buffer->vk, result);
@@ -5339,7 +5312,7 @@ pvr_setup_vertex_buffers(struct pvr_cmd_buffer *cmd_buffer,
          pvr_dev_addr_t addr;
 
          if (binding->size <
-             (attribute->offset + attribute->component_size_in_bytes)) {
+             (attribute->offset + attribute->attrib_size_in_bytes)) {
             /* Replace with load from robustness buffer when no attribute is in
              * range
              */
@@ -5372,26 +5345,54 @@ pvr_setup_vertex_buffers(struct pvr_cmd_buffer *cmd_buffer,
             &cmd_buffer->vk.dynamic_graphics_state;
          uint32_t stride =
             dynamic_state->vi_binding_strides[ddmadt_src3->binding_index];
-         uint32_t bound_size = binding->buffer->vk.size - binding->offset;
+         uint32_t valid_buffer_size =
+            binding->buffer->vk.size - binding->offset - ddmadt_src3->offset;
+         uint32_t attrib_size = ddmadt_src3->attrib_size_in_bytes;
+         uint32_t dma_size = ddmadt_src3->size_in_dwords * 4;
          uint64_t control_qword;
          uint32_t control_dword;
 
          assert(PVR_HAS_FEATURE(&cmd_buffer->device->pdevice->dev_info,
                                 pds_ddmadt));
 
-         if (stride) {
-            bound_size -= bound_size % stride;
-            if (bound_size == 0) {
-               /* If size is zero, DMA OOB won't execute. Read will come from
-                * robustness buffer.
+         /* The DMA should cover the whole attribute, but do not overread
+          * more than the headroom when allocating memory for buffers.
+          */
+         assert(dma_size >= attrib_size);
+         assert(dma_size <= attrib_size + PVR_BUFFER_MEMORY_PADDING_SIZE);
+
+         /* DDMADT checks whether the whole DMA request (size indicated by
+          * the sizes_in_dwords field) is out of the regions set by msize.
+          * Set the buffer size to the last valid vertex DMA address plus
+          * the size of one DMA request.
+          *
+          * This also ensures at least one valid inbound DDMAD is possible.
+          * In case the original buffer isn't big enough for one DMA, the
+          * DDMADT source_address should have been already redirected to the
+          * robust buffer when setting up ROBUST_VERTEX_ATTRIBUTE_ADDRESS.
+          *
+          * See also the pseudocode in pvr_pds_generate_vertex_primary_program()
+          * before the "LAST DDMAD" mark, which explains how DDMAD(T) works.
+          */
+         if (stride == 0) {
+            /* All DMA requests happen on the same address */
+            valid_buffer_size = 0;
+         } else {
+            uint32_t buffer_tail_size = valid_buffer_size % stride;
+            valid_buffer_size -= buffer_tail_size;
+            if (buffer_tail_size < attrib_size && valid_buffer_size != 0) {
+               /* The buffer tail isn't big enough for a vertex attribute fetch
+                * operation so the last valid DMA happens on the last whole
+                * stride.
                 */
-               bound_size = stride;
+               valid_buffer_size -= stride;
             }
          }
+         valid_buffer_size += dma_size;
 
          pvr_csb_pack (&control_qword, PDSINST_DDMAD_FIELDS_SRC3, src3) {
             src3.test = true;
-            src3.msize = bound_size;
+            src3.msize = valid_buffer_size;
          }
          control_dword = (uint32_t)(control_qword >> 32);
 
@@ -5410,7 +5411,7 @@ pvr_setup_vertex_buffers(struct pvr_cmd_buffer *cmd_buffer,
             &state->vertex_bindings[attribute->binding_index];
          const uint64_t bound_size = binding->buffer->vk.size - binding->offset;
          const uint32_t attribute_end =
-            attribute->offset + attribute->component_size_in_bytes;
+            attribute->offset + attribute->attrib_size_in_bytes;
          const struct vk_dynamic_graphics_state *dynamic_state =
             &cmd_buffer->vk.dynamic_graphics_state;
          const uint32_t stride =
@@ -7809,6 +7810,7 @@ static inline bool pvr_ppp_dynamic_state_isp_faces_and_control_dirty(
           BITSET_TEST(dynamic_dirty, MESA_VK_DYNAMIC_DS_STENCIL_COMPARE_MASK) ||
           BITSET_TEST(dynamic_dirty, MESA_VK_DYNAMIC_DS_STENCIL_REFERENCE) ||
           BITSET_TEST(dynamic_dirty, MESA_VK_DYNAMIC_DS_STENCIL_WRITE_MASK) ||
+          BITSET_TEST(dynamic_dirty, MESA_VK_DYNAMIC_DS_STENCIL_OP) ||
           BITSET_TEST(dynamic_dirty, MESA_VK_DYNAMIC_RS_DEPTH_BIAS_ENABLE) ||
           BITSET_TEST(dynamic_dirty, MESA_VK_DYNAMIC_RS_LINE_WIDTH) ||
           BITSET_TEST(dynamic_dirty,

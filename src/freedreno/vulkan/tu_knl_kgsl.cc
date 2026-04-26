@@ -565,21 +565,61 @@ kgsl_is_memory_type_supported(int fd, uint32_t flags)
 static bool
 kgsl_is_virtual_bo_supported(int fd)
 {
-   struct kgsl_gpuobj_alloc req_alloc = {
-      .size = 0x1000,
+   bool supported = false;
+   struct kgsl_gpuobj_alloc req_alloc_parent = {
+      .size = 0x2000,
       .flags = KGSL_MEMFLAGS_VBO,
    };
+   struct kgsl_gpumem_alloc_id req_alloc_child = {
+      .size = 0x1000,
+   };
+   struct kgsl_gpumem_bind_range req_range = {};
+   struct kgsl_gpumem_bind_ranges req_ranges = {};
+   struct kgsl_gpumem_free_id req_free_child = {};
+   struct kgsl_gpuobj_free req_free_parent = {};
 
-   int ret = safe_ioctl(fd, IOCTL_KGSL_GPUOBJ_ALLOC, &req_alloc);
+   int ret = safe_ioctl(fd, IOCTL_KGSL_GPUOBJ_ALLOC, &req_alloc_parent);
    if (ret) {
       return false;
    }
 
-   struct kgsl_gpuobj_free req_free = { .id = req_alloc.id };
+   ret = safe_ioctl(fd, IOCTL_KGSL_GPUMEM_ALLOC_ID, &req_alloc_child);
+   if (ret) {
+      goto free_parent;
+   }
 
-   safe_ioctl(fd, IOCTL_KGSL_GPUOBJ_FREE, &req_free);
+   req_range = {
+      .child_offset = 0,
+      .target_offset = 0,
+      .length = 0x1000,
+      .child_id = req_alloc_child.id,
+      .op = KGSL_GPUMEM_RANGE_OP_BIND,
+   };
 
-   return true;
+   req_ranges = {
+      .ranges = (uint64_t) (uintptr_t) &req_range,
+      .ranges_nents = 1,
+      .ranges_size = sizeof(req_range),
+      .id = req_alloc_parent.id,
+      .flags = 0,
+   };
+
+   ret = safe_ioctl(fd, IOCTL_KGSL_GPUMEM_BIND_RANGES, &req_ranges);
+   if (ret) {
+      goto free_child;
+   }
+
+   supported = true;
+
+free_child:
+   req_free_child = { .id = req_alloc_child.id };
+   safe_ioctl(fd, IOCTL_KGSL_GPUMEM_FREE_ID, &req_free_child);
+
+free_parent:
+   req_free_parent = { .id = req_alloc_parent.id };
+   safe_ioctl(fd, IOCTL_KGSL_GPUOBJ_FREE, &req_free_parent);
+
+   return supported;
 }
 
 enum kgsl_syncobj_state {

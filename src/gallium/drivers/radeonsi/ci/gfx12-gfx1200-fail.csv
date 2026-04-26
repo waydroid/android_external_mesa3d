@@ -22,8 +22,6 @@ spec@oes_shader_io_blocks@compiler@layout-location-aliasing.vert,Fail
 spec@!opengl 1.0@rasterpos,Fail
 spec@!opengl 1.0@rasterpos@glsl_vs_gs_linked,Fail
 spec@!opengl 1.0@rasterpos@glsl_vs_tes_linked,Fail
-# This is caused by lowering mediump before linking:
-spec@glsl-es-1.00@linker@glsl-mismatched-uniform-precision-unused,Fail
 
 # glcts failures
 ## Test issue - https://github.com/KhronosGroup/VK-GL-CTS/issues/251

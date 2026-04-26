@@ -79,6 +79,8 @@ if with_gallium_va
     endif
   endforeach
 
+  devenv.set('LIBVA_DRIVERS_PATH', meson.current_build_dir())
+
   if va_drivers.length() > 0
     meson.add_install_script(
       install_megadrivers,

@@ -714,7 +714,7 @@ nvk_cmd_invalidate_deps(struct nvk_cmd_buffer *cmd,
        dev->vk.enabled_features.pipelineFragmentShadingRate)
       P_IMMD(p, NVC597, INVALIDATE_RASTER_CACHE_NO_WFI, 0);
 
-   if (barriers & (NVK_BARRIER_INVALIDATE_SHADER_DATA &
+   if (barriers & (NVK_BARRIER_INVALIDATE_SHADER_DATA |
                    NVK_BARRIER_INVALIDATE_CONSTANT)) {
       if (nvk_cmd_buffer_last_subchannel(cmd) == SUBC_NVA097) {
          P_IMMD(p, NVA097, INVALIDATE_SHADER_CACHES_NO_WFI, {

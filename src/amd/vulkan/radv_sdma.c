@@ -610,18 +610,22 @@ radv_sdma_use_t2t_scanline_copy(const struct radv_device *device, const struct r
          return true;
    }
 
-   /* The two images can have a different block size,
-    * but must have the same swizzle mode.
-    */
-   if (src->micro_tile_mode != dst->micro_tile_mode)
-      return true;
-
    /* The T2T subwindow copy packet only has fields for one metadata configuration.
     * It can either compress or decompress, or copy uncompressed images, but it
     * can't copy from a compressed image to another.
     */
    if (src->is_compressed && dst->is_compressed)
       return true;
+
+   if (ver >= SDMA_7_0) {
+      /* No support for tiling format transformation at all. */
+      if (src->surf->u.gfx9.swizzle_mode != dst->surf->u.gfx9.swizzle_mode)
+         return true;
+   } else {
+      /* The two images can have a different block size, but must have the same swizzle mode. */
+      if (src->micro_tile_mode != dst->micro_tile_mode)
+         return true;
+   }
 
    const bool needs_3d_alignment = src->is_3d && (src->micro_tile_mode == RADEON_MICRO_MODE_DISPLAY ||
                                                   src->micro_tile_mode == RADEON_MICRO_MODE_STANDARD);

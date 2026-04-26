@@ -383,8 +383,21 @@ remat_to(bi_builder *b, bi_index dst, struct spill_ctx *ctx, unsigned node)
    }
 }
 
+/* This tries to return a cursor in the block in which 'node' is defined.
+ * Returns the fallback position if the block that defines 'node' equals
+ * 'current_block'.
+ *
+ * 'current_block' if called from:
+ * - min_algorithm: ctx->block
+ * - insert_coupling_code: current_block should be the block in which the spill
+ *   is needed (i.e. not ctx->block, if ctx->block == succ, but the spill is
+ *   required from pred). The reason for this is, if a value defined in succ
+ *   needs to be spilled first along the backedge back to succ from pred, the
+ *   spilled version can be undefined at the place of a later use.
+ */
 static bi_cursor
-choose_spill_position(struct spill_ctx *ctx, unsigned node, bi_cursor fallback)
+choose_spill_position(struct spill_ctx *ctx, unsigned node, bi_cursor fallback,
+                      bi_block *current_block)
 {
    bi_instr *producer = ctx->ssa_defs[node];
    bi_block *block = ctx->ssa_def_blocks[node];
@@ -392,7 +405,7 @@ choose_spill_position(struct spill_ctx *ctx, unsigned node, bi_cursor fallback)
    assert(producer);
    assert(block);
 
-   if (ctx->block == block)
+   if (current_block == block)
       return fallback;
 
    /* Don't insert spills in the middle of the PHI block. This breaks the
@@ -540,9 +553,10 @@ insert_coupling_code(struct spill_ctx *ctx, bi_block *pred, bi_block *succ)
       /* Copy immediate/uniform phi sources to memory variables at the start of
        * the program, where pressure is zero and hence the copy is legal.
        */
-      if (I->src[s].type != BI_INDEX_NORMAL && I->src[s].type != BI_INDEX_FAU) {
+      if (I->src[s].type != BI_INDEX_NORMAL) {
          assert(I->src[s].type == BI_INDEX_CONSTANT ||
-                I->src[s].type == BI_INDEX_REGISTER);
+                I->src[s].type == BI_INDEX_REGISTER ||
+                I->src[s].type == BI_INDEX_FAU);
 
          bi_index gpr = bi_temp(ctx->shader);
          unsigned bits = 32;
@@ -569,8 +583,8 @@ insert_coupling_code(struct spill_ctx *ctx, bi_block *pred, bi_block *succ)
       }
 
       if (!spilled) {
-         bi_cursor c = choose_spill_position(ctx, I->src[s].value,
-                                             bi_after_block_logical(pred));
+         bi_cursor c = choose_spill_position(
+            ctx, I->src[s].value, bi_after_block_logical(pred), pred);
          bi_builder b = bi_init_builder(ctx->shader, c);
 
          insert_spill(&b, ctx, I->src[s].value);
@@ -615,7 +629,8 @@ insert_coupling_code(struct spill_ctx *ctx, bi_block *pred, bi_block *succ)
       if (spilled)
          continue;
 
-      bi_cursor c = choose_spill_position(ctx, v, bi_along_edge(pred, succ));
+      bi_cursor c = choose_spill_position(ctx, v, bi_along_edge(pred, succ),
+                                          bi_edge_to_block(pred, succ));
       bi_builder b = bi_init_builder(ctx->shader, c);
       insert_spill(&b, ctx, v);
    }
@@ -1187,7 +1202,8 @@ limit(struct spill_ctx *ctx, bi_instr *I, unsigned m)
           * another use
           */
          if (!BITSET_TEST(ctx->S, v) && candidates[i].dist < DIST_INFINITY) {
-            bi_cursor c = choose_spill_position(ctx, v, bi_before_instr(I));
+            bi_cursor c =
+               choose_spill_position(ctx, v, bi_before_instr(I), ctx->block);
             bi_builder b = bi_init_builder(ctx->shader, c);
             insert_spill(&b, ctx, v);
             BITSET_SET(ctx->S, v);

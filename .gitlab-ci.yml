@@ -241,6 +241,7 @@ include:
     # changed, else we'll just use the already-built containers
     - if: *is-merge-attempt
       changes: &image_tags_path
+        - .gitlab-ci.yml
         - .gitlab-ci/image-tags.yml
       when: on_success
     # Skip everything for pre-merge and merge pipelines which don't change

@@ -1887,6 +1887,9 @@ static inline struct si_shader_ctx_state *si_get_vs(struct si_context *sctx)
 
 static inline bool si_get_streamout_enable_state(struct si_context *sctx)
 {
+   if (sctx->blitter_running)
+      return false;
+
    /* For GFX11, return whether NGG streamout queries are enabled. For older gens, return whether
     * streamout hw is enabled.
     *

@@ -1244,17 +1244,26 @@ void r300_emit_hiz_clear(struct r300_context *r300, unsigned size, void *state)
 {
     struct pipe_framebuffer_state *fb =
         (struct pipe_framebuffer_state*)r300->fb_state.state;
-    struct r300_resource* tex;
+    struct r300_resource *tex = r300_resource(fb->zsbuf.texture);
+    unsigned remaining = tex->tex.hiz_dwords[fb->zsbuf.level];
+    unsigned start = 0;
     CS_LOCALS(r300);
 
-    tex = r300_resource(fb->zsbuf.texture);
+    /* 3D_CLEAR_HIZ COUNT is 14-bit (max 0x3fff), so large surfaces must be
+     * split into multiple packets. */
+    while (remaining) {
+        unsigned count = MIN2(remaining, R300_CLEAR_HIZ_COUNT_MAX);
 
-    BEGIN_CS(size);
-    OUT_CS_PKT3(R300_PACKET3_3D_CLEAR_HIZ, 2);
-    OUT_CS(0);
-    OUT_CS(tex->tex.hiz_dwords[fb->zsbuf.level]);
-    OUT_CS(r300->hiz_clear_value);
-    END_CS;
+        BEGIN_CS(4);
+        OUT_CS_PKT3(R300_PACKET3_3D_CLEAR_HIZ, 2);
+        OUT_CS(start);
+        OUT_CS(count);
+        OUT_CS(r300->hiz_clear_value);
+        END_CS;
+
+        start += count;
+        remaining -= count;
+    }
 
     /* Mark the current zbuffer's hiz ram as in use. */
     r300->hiz_in_use = true;

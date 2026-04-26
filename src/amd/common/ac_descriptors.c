@@ -1055,8 +1055,15 @@ ac_init_ds_surface(const struct radeon_info *info, const struct ac_ds_state *sta
 
 static unsigned
 ac_get_decompress_on_z_planes(const struct radeon_info *info, enum pipe_format format, uint8_t log_num_samples,
-                              bool htile_stencil_disabled, bool no_d16_compression)
+                              bool tc_compat_htile_enabled, bool htile_stencil_disabled, bool no_d16_compression,
+                              bool z_allow_expclear)
 {
+   if (info->gfx_level < GFX8)
+      return 0;
+
+   if (!tc_compat_htile_enabled)
+      return z_allow_expclear ? 15 : 0;
+
    uint32_t max_zplanes = 0;
 
    if (info->gfx_level >= GFX9) {
@@ -1073,6 +1080,7 @@ ac_get_decompress_on_z_planes(const struct radeon_info *info, enum pipe_format f
          max_zplanes = 1;
 
       max_zplanes++;
+      assert(max_zplanes != 1); /* 1 is invalid and can cause corruption on gfx11-11.5 */
    } else {
       if (format == PIPE_FORMAT_Z16_UNORM && no_d16_compression) {
          /* Do not enable Z plane compression for 16-bit depth
@@ -1093,6 +1101,7 @@ ac_get_decompress_on_z_planes(const struct radeon_info *info, enum pipe_format f
       }
    }
 
+   assert(max_zplanes != 10 && max_zplanes != 13); /* disallowed values */
    return max_zplanes;
 }
 
@@ -1115,14 +1124,18 @@ ac_set_mutable_ds_surface_fields(const struct radeon_info *info, const struct ac
       log_num_samples = G_028040_NUM_SAMPLES(ds->db_z_info);
    }
 
+   bool z_allow_expclear = info->gfx_level <= GFX11_5 &&
+                           G_028038_ALLOW_EXPCLEAR(ds->db_z_info);
+
    const uint32_t max_zplanes =
       ac_get_decompress_on_z_planes(info, state->format, log_num_samples,
-                                    tile_stencil_disable, state->no_d16_compression);
+                                    state->tc_compat_htile_enabled, tile_stencil_disable,
+                                    state->no_d16_compression, z_allow_expclear);
 
    if (info->gfx_level >= GFX9) {
-      if (state->tc_compat_htile_enabled) {
-         ds->db_z_info |= S_028038_DECOMPRESS_ON_N_ZPLANES(max_zplanes);
+      ds->db_z_info |= S_028038_DECOMPRESS_ON_N_ZPLANES(max_zplanes);
 
+      if (state->tc_compat_htile_enabled) {
          if (info->gfx_level >= GFX10) {
             const bool iterate256 = log_num_samples >= 1;
 
@@ -1138,12 +1151,13 @@ ac_set_mutable_ds_surface_fields(const struct radeon_info *info, const struct ac
 
       ds->db_z_info |= S_028038_ZRANGE_PRECISION(state->zrange_precision);
    } else {
-      if (state->tc_compat_htile_enabled) {
-         ds->u.gfx6.db_htile_surface |= S_028ABC_TC_COMPATIBLE(1);
+      if (info->gfx_level >= GFX8)
          ds->db_z_info |= S_028040_DECOMPRESS_ON_N_ZPLANES(max_zplanes);
-      } else {
+
+      if (state->tc_compat_htile_enabled)
+         ds->u.gfx6.db_htile_surface |= S_028ABC_TC_COMPATIBLE(1);
+      else
          ds->u.gfx6.db_depth_info |= S_02803C_ADDR5_SWIZZLE_MASK(1);
-      }
 
       ds->db_z_info |= S_028040_ZRANGE_PRECISION(state->zrange_precision);
    }

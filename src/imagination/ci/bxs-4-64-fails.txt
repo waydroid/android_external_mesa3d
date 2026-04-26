@@ -34,10 +34,7 @@ dEQP-VK.pipeline.monolithic.stencil.no_stencil_att.dynamic_rendering.dynamic_ena
 dEQP-VK.pipeline.monolithic.stencil.no_stencil_att.dynamic_rendering.dynamic_enable.d32_sfloat_s8_uint,Fail
 dEQP-VK.pipeline.monolithic.stencil.no_stencil_att.dynamic_rendering.static_enable.d24_unorm_s8_uint,Fail
 dEQP-VK.pipeline.monolithic.stencil.no_stencil_att.dynamic_rendering.static_enable.d32_sfloat_s8_uint,Fail
-dEQP-VK.renderpasses.dynamic_rendering.complete_secondary_cmd_buff.dedicated_allocation.attachment.4.568,Fail
-dEQP-VK.renderpasses.dynamic_rendering.complete_secondary_cmd_buff.suballocation.attachment.4.568,Fail
 dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.basic.partial_binding_depth_stencil,Fail
-dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.dedicated_allocation.attachment.4.568,Fail
 dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.random.seed0_multiview,Fail
 dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.random.seed0,Fail
 dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.random.seed1_multiview,Fail
@@ -237,7 +234,6 @@ dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.random.seed98_multiview,
 dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.random.seed98,Fail
 dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.random.seed99_multiview,Fail
 dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.random.seed99,Fail
-dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.suballocation.attachment.4.568,Fail
 dEQP-VK.renderpasses.renderpass2.depth_stencil_resolve.image_2d_17_1.samples_2.d24_unorm_s8_uint_separate_layouts.depth_none_stencil_zero_testing_stencil,Fail
 dEQP-VK.renderpasses.renderpass2.depth_stencil_resolve.image_2d_17_1.samples_2.d24_unorm_s8_uint_separate_layouts.depth_zero_stencil_none_testing_depth,Fail
 dEQP-VK.renderpasses.renderpass2.depth_stencil_resolve.image_2d_17_1.samples_2.d24_unorm_s8_uint.depth_none_stencil_zero_testing_stencil,Fail

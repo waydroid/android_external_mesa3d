@@ -774,7 +774,7 @@ debian-riscv64:
 # While s390 is dead, s390x is very much alive, and one of the last major
 # big-endian platforms, so it provides useful coverage.
 # In case of issues with this job, contact @ajax
-debian-s390x:
+.debian-s390x:
   extends:
     - .meson-cross
     - .use-debian/s390x_build
@@ -789,7 +789,7 @@ debian-s390x:
     DRI_LOADERS:
       -D glvnd=disabled
 
-debian-ppc64el:
+.debian-ppc64el:
   extends:
     - .meson-cross
     - .use-debian/ppc64el_build

@@ -428,6 +428,21 @@ process_block(vn_ctx& ctx, Block& block)
 }
 
 void
+dce_instructions(vn_ctx& ctx, Block& block)
+{
+   std::vector<aco_ptr<Instruction>> new_instructions;
+   new_instructions.reserve(block.instructions.size());
+
+   for (aco_ptr<Instruction>& instr : block.instructions) {
+      if (is_dead(ctx.uses, instr.get()))
+         continue;
+      new_instructions.emplace_back(std::move(instr));
+   }
+
+   block.instructions = std::move(new_instructions);
+}
+
+void
 rename_phi_operands(Block& block, aco::unordered_map<uint32_t, Temp>& renames)
 {
    for (aco_ptr<Instruction>& phi : block.instructions) {
@@ -467,10 +482,12 @@ value_numbering(Program* program)
       if (block.logical_idom == (int)block.index)
          ctx.expr_values.clear();
 
-      if (block.logical_idom != -1)
+      if (block.logical_idom != -1) {
          process_block(ctx, block);
-      else
+      } else {
+         dce_instructions(ctx, block);
          rename_phi_operands(block, ctx.renames);
+      }
 
       /* increment exec_id when entering nested control flow */
       if (block.kind & block_kind_branch || block.kind & block_kind_loop_preheader ||

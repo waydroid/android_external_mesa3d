@@ -700,7 +700,6 @@ static struct pipe_context *si_create_context(struct pipe_screen *screen, unsign
          mesa_loge("can't create blitter");
          goto fail;
       }
-      sctx->blitter->skip_viewport_restore = true;
 
       /* Some states are expected to be always non-NULL. */
       sctx->noop_blend = util_blitter_get_noop_blend_state(sctx->blitter);

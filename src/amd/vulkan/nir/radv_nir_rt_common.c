@@ -560,15 +560,12 @@ create_bvh_descriptor(nir_builder *b, const struct radv_physical_device *pdev, s
       /* Enable pointer flags on GFX11+ */
       dword3 |= BITFIELD_BIT(119 - 96);
 
-      /* Instead of the default box sorting (closest point), use largest for terminate_on_first_hit rays and midpoint
-       * for closest hit; this makes it more likely that the ray traversal will visit fewer nodes. */
+      /* Instead of the default box sorting (closest point), use largest for terminate_on_first_hit rays;
+       * this makes it more likely that the ray traversal will visit fewer nodes. */
       const uint32_t box_sort_largest = 1;
-      const uint32_t box_sort_midpoint = 2;
 
-      /* Only use largest/midpoint sorting when all invocations have the same ray flags, otherwise
+      /* Only use largest sorting when all invocations have the same ray flags, otherwise
        * fall back to the default closest point. */
-      dword1 = nir_bcsel(b, nir_vote_any(b, 1, ray_flags->terminate_on_first_hit), dword1,
-                         nir_imm_int(b, (box_sort_midpoint << 21) | sort_triangles_first | box_sort_enable));
       dword1 = nir_bcsel(b, nir_vote_all(b, 1, ray_flags->terminate_on_first_hit),
                          nir_imm_int(b, (box_sort_largest << 21) | sort_triangles_first | box_sort_enable), dword1);
    }
@@ -878,7 +875,7 @@ radv_build_ray_traversal(struct radv_device *device, nir_builder *b, const struc
          /* Early exit if we never overflowed the stack, to avoid having to backtrack to
           * the root for no reason. */
          if (!args->use_bvh_stack_rtn) {
-            nir_push_if(b, nir_ilt_imm(b, nir_load_deref(b, args->vars.stack), args->stack_base + args->stack_stride));
+            nir_push_if(b, nir_ilt_imm(b, nir_load_deref(b, args->vars.stack), args->stack_stride));
             {
                nir_store_var(b, incomplete, nir_imm_false(b), 0x1);
                nir_jump(b, nir_jump_break);
@@ -1174,7 +1171,7 @@ radv_build_ray_traversal_gfx12(struct radv_device *device, nir_builder *b, const
          /* Early exit if we never overflowed the stack, to avoid having to backtrack to
           * the root for no reason. */
          if (!args->use_bvh_stack_rtn) {
-            nir_push_if(b, nir_ilt_imm(b, nir_load_deref(b, args->vars.stack), args->stack_base + args->stack_stride));
+            nir_push_if(b, nir_ilt_imm(b, nir_load_deref(b, args->vars.stack), args->stack_stride));
             {
                nir_store_var(b, incomplete, nir_imm_false(b), 0x1);
                nir_jump(b, nir_jump_break);

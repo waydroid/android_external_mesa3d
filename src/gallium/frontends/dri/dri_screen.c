@@ -153,9 +153,11 @@ driCreateConfigs(enum pipe_format format,
    unsigned num_accum_bits = (enable_accum) ? 2 : 1;
    bool is_srgb;
    bool is_float;
+   bool is_unorm16;
 
    is_srgb = util_format_is_srgb(format);
    is_float = util_format_is_float(format);
+   is_unorm16 = util_format_is_unorm16(util_format_description(format));
 
    for (i = 0; i < 4; i++) {
       color_bits[i] =
@@ -168,7 +170,11 @@ driCreateConfigs(enum pipe_format format,
          shifts[i] = -1;
       }
 
-      if (is_float || color_bits[i] == 0)
+      /* is_float and is_unorm16 is only true on non-x11 target platforms, which
+       * don't actually use redMask, greenMask, ..., so avoid setting masks[]
+       * to prevent a meaningless "undefined behaviour" build warning.
+       */
+      if (is_float || is_unorm16 || color_bits[i] == 0)
          masks[i] = 0;
       else
          masks[i] = ((1u << color_bits[i]) - 1) << shifts[i];
@@ -588,6 +594,7 @@ dri_destroy_screen(struct dri_screen *screen)
 {
    dri_release_screen(screen);
 
+   free(screen->options.force_explicit_uniform_loc_zero);
    free(screen->options.force_gl_vendor);
    free(screen->options.force_gl_renderer);
    free(screen->options.mesa_extension_override);

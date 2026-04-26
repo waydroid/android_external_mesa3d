@@ -491,6 +491,8 @@ zink_blit(struct pipe_context *pctx,
    if (whole)
       pctx->invalidate_resource(pctx, info->dst.resource);
 
+   bool zsbuf_unused = ctx->zsbuf_unused;
+   bool zsbuf_readonly = ctx->zsbuf_readonly;
    ctx->unordered_blitting = !(info->render_condition_enable && ctx->render_condition_active) &&
                              !needs_present_readback &&
                              zink_get_cmdbuf(ctx, src, dst) == ctx->bs->reordered_cmdbuf;
@@ -571,6 +573,8 @@ zink_blit(struct pipe_context *pctx,
       ctx->gfx_pipeline_state.pipeline = pipeline;
       ctx->pipeline_changed[ZINK_PIPELINE_GFX] = true;
       ctx->ds3_states = ds3_states;
+      ctx->zsbuf_readonly = zsbuf_readonly;
+      ctx->zsbuf_unused = zsbuf_unused;
       zink_select_draw_vbo(ctx);
    }
    ctx->unordered_blitting = false;

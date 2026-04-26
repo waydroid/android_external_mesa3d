@@ -1314,7 +1314,8 @@ static int setup_dpb(struct radeon_encoder *enc, uint32_t num_reconstructed_pict
    uint32_t aligned_width = align(enc->base.width, rec_alignment);
    uint32_t aligned_height = align(enc->base.height, rec_alignment);
    uint32_t pitch = align(aligned_width, enc->alignment);
-   uint32_t luma_size, chroma_size, pre_luma_size = 0, pre_chroma_size = 0, offset;
+   uint32_t luma_size, chroma_size, offset;
+   uint32_t pre_luma_size = 0, pre_chroma_size = 0, pre_input_plane_size = 0;
    struct radeon_enc_pic *enc_pic = &enc->enc_pic;
    int i;
    bool has_b = enc_pic->spec_misc.b_picture_enabled; /* for h264 only */
@@ -1328,15 +1329,18 @@ static int setup_dpb(struct radeon_encoder *enc, uint32_t num_reconstructed_pict
    if (enc_pic->quality_modes.pre_encode_mode) {
       uint32_t scale = enc_pic->quality_modes.pre_encode_mode;
       uint32_t pre_pitch = align(aligned_width / scale, enc->alignment);
-      uint32_t pre_aligned_height = align(aligned_height / scale, enc->alignment);
+      uint32_t pre_aligned_height = MAX2(align(aligned_height / scale, enc->alignment), 256);
 
-      pre_luma_size = align(pre_pitch * MAX2(256, pre_aligned_height), enc->alignment);
+      /* VCN FW always writes the preencode input picture using the input picture pitch. */
+      pre_input_plane_size = align(pitch * pre_aligned_height, enc->alignment);
+      pre_luma_size = align(pre_pitch * pre_aligned_height, enc->alignment);
       pre_chroma_size = align(pre_luma_size / 2, enc->alignment);
    }
 
    if (enc_pic->bit_depth_luma_minus8 || enc_pic->bit_depth_chroma_minus8) {
       luma_size *= 2;
       chroma_size *= 2;
+      pre_input_plane_size *= 2;
       pre_luma_size *= 2;
       pre_chroma_size *= 2;
    }
@@ -1366,11 +1370,11 @@ static int setup_dpb(struct radeon_encoder *enc, uint32_t num_reconstructed_pict
 
       if (enc_pic->quality_modes.pre_encode_mode) {
          enc_pic->ctx_buf.pre_encode_input_picture.rgb.red_offset = offset;
-         offset += pre_luma_size;
+         offset += pre_input_plane_size;
          enc_pic->ctx_buf.pre_encode_input_picture.rgb.green_offset = offset;
-         offset += pre_luma_size;
+         offset += pre_input_plane_size;
          enc_pic->ctx_buf.pre_encode_input_picture.rgb.blue_offset = offset;
-         offset += pre_luma_size;
+         offset += pre_input_plane_size;
       }
 
       if (is_av1) {
@@ -1408,11 +1412,11 @@ static int setup_dpb(struct radeon_encoder *enc, uint32_t num_reconstructed_pict
 
       if (enc_pic->quality_modes.pre_encode_mode) {
          enc_pic->ctx_buf.pre_encode_input_picture.rgb.red_offset = offset;
-         offset += pre_luma_size;
+         offset += pre_input_plane_size;
          enc_pic->ctx_buf.pre_encode_input_picture.rgb.green_offset = offset;
-         offset += pre_luma_size;
+         offset += pre_input_plane_size;
          enc_pic->ctx_buf.pre_encode_input_picture.rgb.blue_offset = offset;
-         offset += pre_luma_size;
+         offset += pre_input_plane_size;
       }
 
       for (i = 0; i < num_reconstructed_pictures; i++) {

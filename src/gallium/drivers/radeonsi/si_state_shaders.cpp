@@ -1982,25 +1982,6 @@ static void si_shader_vs(struct si_screen *sscreen, struct si_shader *shader,
    ac_pm4_finalize(&pm4->base);
 }
 
-static unsigned si_get_spi_shader_col_format(struct si_shader *shader)
-{
-   unsigned spi_shader_col_format = shader->key.ps.part.epilog.spi_shader_col_format;
-   unsigned value = 0, num_mrts = 0;
-   unsigned i, num_targets = (util_last_bit(spi_shader_col_format) + 3) / 4;
-
-   /* Remove holes in spi_shader_col_format. */
-   for (i = 0; i < num_targets; i++) {
-      unsigned spi_format = (spi_shader_col_format >> (i * 4)) & 0xf;
-
-      if (spi_format) {
-         value |= spi_format << (num_mrts * 4);
-         num_mrts++;
-      }
-   }
-
-   return value;
-}
-
 static void gfx6_emit_shader_ps(struct si_context *sctx, unsigned index)
 {
    struct si_shader *shader = sctx->queued.named.ps;
@@ -2010,8 +1991,8 @@ static void gfx6_emit_shader_ps(struct si_context *sctx, unsigned index)
                                shader->ps.spi_ps_input_ena,
                                shader->ps.spi_ps_input_addr);
    radeon_opt_set_context_reg2(R_028710_SPI_SHADER_Z_FORMAT, AC_TRACKED_SPI_SHADER_Z_FORMAT,
-                               shader->ps.spi_shader_z_format,
-                               shader->ps.spi_shader_col_format);
+                               shader->info.spi_shader_z_format,
+                               shader->info.spi_shader_col_format);
    radeon_opt_set_context_reg(R_02823C_CB_SHADER_MASK, AC_TRACKED_CB_SHADER_MASK,
                               shader->ps.cb_shader_mask);
    radeon_end_update_context_roll();
@@ -2028,9 +2009,9 @@ static void gfx11_dgpu_emit_shader_ps(struct si_context *sctx, unsigned index)
    gfx11_opt_set_context_reg(R_0286D0_SPI_PS_INPUT_ADDR, AC_TRACKED_SPI_PS_INPUT_ADDR,
                              shader->ps.spi_ps_input_addr);
    gfx11_opt_set_context_reg(R_028710_SPI_SHADER_Z_FORMAT, AC_TRACKED_SPI_SHADER_Z_FORMAT,
-                             shader->ps.spi_shader_z_format);
+                             shader->info.spi_shader_z_format);
    gfx11_opt_set_context_reg(R_028714_SPI_SHADER_COL_FORMAT, AC_TRACKED_SPI_SHADER_COL_FORMAT,
-                             shader->ps.spi_shader_col_format);
+                             shader->info.spi_shader_col_format);
    gfx11_opt_set_context_reg(R_02823C_CB_SHADER_MASK, AC_TRACKED_CB_SHADER_MASK,
                              shader->ps.cb_shader_mask);
    gfx11_end_packed_context_regs();
@@ -2044,9 +2025,9 @@ static void gfx12_emit_shader_ps(struct si_context *sctx, unsigned index)
    radeon_begin(&sctx->gfx_cs);
    gfx12_begin_context_regs();
    gfx12_opt_set_context_reg(R_028650_SPI_SHADER_Z_FORMAT, AC_TRACKED_SPI_SHADER_Z_FORMAT,
-                             shader->ps.spi_shader_z_format);
+                             shader->info.spi_shader_z_format);
    gfx12_opt_set_context_reg(R_028654_SPI_SHADER_COL_FORMAT, AC_TRACKED_SPI_SHADER_COL_FORMAT,
-                             shader->ps.spi_shader_col_format);
+                             shader->info.spi_shader_col_format);
    gfx12_opt_set_context_reg(R_02865C_SPI_PS_INPUT_ENA, AC_TRACKED_SPI_PS_INPUT_ENA,
                              shader->ps.spi_ps_input_ena);
    gfx12_opt_set_context_reg(R_028660_SPI_PS_INPUT_ADDR, AC_TRACKED_SPI_PS_INPUT_ADDR,
@@ -2179,47 +2160,10 @@ static void si_shader_ps(struct si_screen *sscreen, struct si_shader *shader)
    if (sscreen->info.has_rbplus && !sscreen->info.rbplus_allowed)
       shader->ps.db_shader_control |= S_02880C_DUAL_QUAD_DISABLE(1);
 
-   shader->ps.spi_shader_col_format = si_get_spi_shader_col_format(shader);
    shader->ps.cb_shader_mask = ac_get_cb_shader_mask(shader->key.ps.part.epilog.spi_shader_col_format);
    shader->ps.spi_ps_input_ena = shader->config.spi_ps_input_ena;
    shader->ps.spi_ps_input_addr = shader->config.spi_ps_input_addr;
    shader->ps.num_interp = si_get_ps_num_interp(shader);
-   shader->ps.spi_shader_z_format =
-      ac_get_spi_shader_z_format(shader->info.writes_z, shader->info.writes_stencil,
-                                 shader->info.writes_sample_mask,
-                                 shader->key.ps.part.epilog.alpha_to_coverage_via_mrtz);
-
-   /* Ensure that some export memory is always allocated, for two reasons:
-    *
-    * 1) Correctness: The hardware ignores the EXEC mask if no export
-    *    memory is allocated, so KILL and alpha test do not work correctly
-    *    without this.
-    * 2) Performance: Every shader needs at least a NULL export, even when
-    *    it writes no color/depth output. The NULL export instruction
-    *    stalls without this setting.
-    *
-    * Don't add this to CB_SHADER_MASK.
-    *
-    * GFX10 supports pixel shaders without exports by setting both
-    * the color and Z formats to SPI_SHADER_ZERO. The hw will skip export
-    * instructions if any are present.
-    *
-    * RB+ depth-only rendering requires SPI_SHADER_32_R.
-    */
-   bool has_mrtz = shader->ps.spi_shader_z_format != V_028710_SPI_SHADER_ZERO;
-
-   if (!shader->ps.spi_shader_col_format) {
-      if (shader->key.ps.part.epilog.rbplus_depth_only_opt) {
-         shader->ps.spi_shader_col_format = V_028714_SPI_SHADER_32_R;
-      } else if (!has_mrtz) {
-         if (sscreen->info.gfx_level >= GFX10) {
-            if (G_02880C_KILL_ENABLE(shader->ps.db_shader_control))
-               shader->ps.spi_shader_col_format = V_028714_SPI_SHADER_32_R;
-         } else {
-            shader->ps.spi_shader_col_format = V_028714_SPI_SHADER_32_R;
-         }
-      }
-   }
 
    if (sscreen->info.gfx_level >= GFX12) {
       shader->ps.spi_ps_in_control = S_028640_PARAM_GEN(shader->key.ps.mono.point_smoothing) |

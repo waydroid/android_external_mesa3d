@@ -1017,7 +1017,7 @@ struct pvr_pds_vertex_dma {
 
    uint8_t flags;
    uint8_t size_in_dwords;
-   uint8_t component_size_in_bytes;
+   uint8_t attrib_size_in_bytes;
    uint8_t destination;
    uint8_t binding_index;
    uint32_t divisor;
@@ -1169,7 +1169,7 @@ struct pvr_const_map_entry_robust_vertex_attribute_address {
    uint8_t binding_index;
    uint8_t size_in_dwords;
    uint16_t robustness_buffer_offset;
-   uint8_t component_size_in_bytes;
+   uint8_t attrib_size_in_bytes;
 } PVR_PACKED;
 
 struct pvr_const_map_entry_vertex_attribute_max_index {
@@ -1180,7 +1180,7 @@ struct pvr_const_map_entry_vertex_attribute_max_index {
    uint8_t size_in_dwords;
    uint16_t offset;
    uint16_t stride;
-   uint8_t component_size_in_bytes;
+   uint8_t attrib_size_in_bytes;
 } PVR_PACKED;
 
 struct pvr_const_map_entry_base_instance {
@@ -1203,6 +1203,9 @@ struct pvr_pds_const_map_entry_vertex_attr_ddmadt_oob_buffer_size {
    uint8_t type;
    uint8_t const_offset;
    uint8_t binding_index;
+   uint8_t size_in_dwords;
+   uint16_t offset;
+   uint8_t attrib_size_in_bytes;
 } PVR_PACKED;
 
 struct pvr_pds_const_map_entry_cond_render {

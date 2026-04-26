@@ -147,7 +147,8 @@ void r300_set_clip_discard_distance(struct r300_context *r300, float distance)
         r300->min_clip_discard_distance_watermark = MIN2(distance, 6.0f);
     }
 
-    float new_distance = MAX2(distance, r300->min_clip_discard_distance_watermark);
+    float new_distance = distance > 0.0f ?
+        MAX2(distance, r300->min_clip_discard_distance_watermark) : 0.0f;
 
     if (r300->current_clip_discard_distance != new_distance) {
         r300->current_clip_discard_distance = new_distance;

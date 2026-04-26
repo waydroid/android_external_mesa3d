@@ -58,7 +58,7 @@ bool vl_codec_supported(struct pipe_screen *screen,
          return false;
    }
    if (profile >= PIPE_VIDEO_PROFILE_MPEG1 &&
-       profile <= PIPE_VIDEO_PROFILE_MPEG2_SIMPLE) {
+       profile <= PIPE_VIDEO_PROFILE_MPEG2_MAIN) {
       if (!VIDEO_CODEC_MPEG12DEC)
          return false;
    }

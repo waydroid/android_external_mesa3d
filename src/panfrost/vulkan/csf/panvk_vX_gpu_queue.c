@@ -1249,7 +1249,7 @@ panvk_queue_submit_process_debug(const struct panvk_queue_submit *submit,
       for (uint32_t i = 0; i < ARRAY_SIZE(queue->subqueues); i++) {
          panvk_priv_mem_readback(queue->subqueues[i].context, 0,
                                  struct panvk_cs_subqueue_context, ctx) {
-            size_t trace_size = trace_size =
+            size_t trace_size =
                ctx->debug.tracebuf.cs - queue->subqueues[i].tracebuf.addr.dev;
 
             if (trace_size) {

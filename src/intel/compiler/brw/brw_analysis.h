@@ -396,7 +396,7 @@ public:
    bool validate(const brw_shader *) const;
 
 private:
-   void mark_invalid(int);
+   void mark_invalid(const brw_reg &);
    bool fully_defines(const brw_shader *v, brw_inst *);
    void update_for_reads(const brw_idom_tree &idom, brw_inst *);
    void update_for_write(const brw_shader *v, brw_inst *);

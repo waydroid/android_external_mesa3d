@@ -43,6 +43,7 @@ extern "C" {
 
 #define FP16_ONE     ((uint16_t) 0x3c00)
 #define FP16_ZERO    ((uint16_t) 0)
+#define FP16_MAX_F   65504.0
 
 uint16_t _mesa_float_to_half_slow(float val);
 float _mesa_half_to_float_slow(uint16_t val);

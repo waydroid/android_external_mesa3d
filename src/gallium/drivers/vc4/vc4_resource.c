@@ -108,6 +108,13 @@ vc4_map_usage_prep(struct pipe_context *pctx,
         MESA_TRACE_FUNC();
 
         if (usage & PIPE_MAP_DISCARD_WHOLE_RESOURCE) {
+                /* Flush any pending write jobs before replacing the BO.
+                 * The RCL reads rsc->bo at job submit time, so if we
+                 * replace the BO first, a later flush of the pending
+                 * job would resolve the new BO instead of the old one,
+                 * corrupting the new data with a stale store.
+                 */
+                vc4_flush_jobs_writing_resource(vc4, prsc);
                 if (vc4_resource_bo_alloc(rsc)) {
                         /* If it might be bound as one of our vertex buffers,
                          * make sure we re-emit vertex buffer state.
@@ -1141,12 +1148,6 @@ vc4_get_shadow_index_buffer(struct pipe_context *pctx,
         struct vc4_resource *orig = vc4_resource(info->index.resource);
         perf_debug("Fallback conversion for %d uint indices\n", count);
 
-        void *data;
-        struct pipe_resource *shadow_rsc = NULL;
-        u_upload_alloc_ref(vc4->uploader, 0, count * 2, 4,
-                       shadow_offset, &shadow_rsc, &data);
-        uint16_t *dst = data;
-
         struct pipe_transfer *src_transfer = NULL;
         const uint32_t *src;
         if (info->has_user_indices) {
@@ -1157,6 +1158,20 @@ vc4_get_shadow_index_buffer(struct pipe_context *pctx,
                                             count * 4,
                                             PIPE_MAP_READ, &src_transfer);
         }
+
+        /* We need to do the upload alloc ref after the
+         * pipe_buffer_map_range() because there is a risk that the alloc
+         * frees and destroy its internal buffer, which might be the original
+         * base buffer we want to copy. Calling it afterwards, we guarantee
+         * that pipe_buffer_map_range() increases the reference counter so if
+         * upload alloc ref needs to unreference it, the buffer doesn't reach
+         * 0 refcounts and thus it won't be destroyed.
+         */
+        void *data;
+        struct pipe_resource *shadow_rsc = NULL;
+        u_upload_alloc_ref(vc4->uploader, 0, count * 2, 4,
+                       shadow_offset, &shadow_rsc, &data);
+        uint16_t *dst = data;
 
         for (int i = 0; i < count; i++) {
                 uint32_t src_index = src[i];

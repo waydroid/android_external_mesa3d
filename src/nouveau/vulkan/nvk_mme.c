@@ -79,9 +79,11 @@ nvk_mme_test_state_state(void *_ts, uint16_t addr)
    /* First, look backwards through the expected data that we've already
     * written.  This ensures that mthd() impacts state().
     */
-   for (int32_t i = ts->ei - 1; i >= 0; i--) {
-      if (ts->test->expected[i].mthd == addr)
-         return ts->test->expected[i].data;
+   if (ts->test->expected != NULL) {
+      for (int32_t i = ts->ei - 1; i >= 0; i--) {
+         if (ts->test->expected[i].mthd == addr)
+            return ts->test->expected[i].data;
+      }
    }
 
    /* Now look at init.  We assume the init data is unique */

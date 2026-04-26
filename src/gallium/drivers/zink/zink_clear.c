@@ -204,7 +204,7 @@ zink_clear(struct pipe_context *pctx,
    if (ctx->in_rp) {
       if (buffers & PIPE_CLEAR_DEPTHSTENCIL && (ctx->zsbuf_unused || ctx->zsbuf_readonly)) {
          /* this will need a layout change */
-         assert(!ctx->track_renderpasses);
+         assert(!ctx->track_renderpasses || screen->driver_workarounds.general_layout);
          zink_batch_no_rp(ctx);
       } else {
          clear_in_rp(pctx, buffers, scissor_state, pcolor, depth, stencil);

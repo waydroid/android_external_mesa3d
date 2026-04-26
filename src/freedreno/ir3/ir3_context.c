@@ -456,6 +456,16 @@ ir3_get_predicate(struct ir3_context *ctx, struct ir3_instruction *src)
    }
 
    _mesa_hash_table_insert(ctx->predicate_conversions, src, cond);
+
+   /* If we are currently emitting instructions after src, update the context
+    * builder to point after the predicate conversion. Otherwise, we will insert
+    * its uses before its def.
+    */
+   if (ctx->build.cursor.option == IR3_CURSOR_AFTER_INSTR &&
+       ctx->build.cursor.instr == src) {
+      ctx->build = b;
+   }
+
    return cond;
 }
 

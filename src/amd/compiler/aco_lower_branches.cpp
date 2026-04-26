@@ -379,6 +379,10 @@ can_remove_branch(branch_ctx& ctx, Block& block, Pseudo_branch_instruction* bran
       if (uniform_branch && !ctx.program->blocks[i].instructions.empty())
          return false;
 
+      /* Don't enter loops with empty exec mask. */
+      if (ctx.program->blocks[i].loop_nest_depth > block.loop_nest_depth)
+         return false;
+
       for (aco_ptr<Instruction>& instr : ctx.program->blocks[i].instructions) {
          if (instr->isSOPP()) {
             /* Discard early exits and loop breaks and continues should work fine with

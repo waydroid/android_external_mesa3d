@@ -1596,6 +1596,12 @@ anv_shader_lower_nir(struct anv_device *device,
    shader_data->push_desc_info.fully_promoted_ubo_descriptors =
       anv_nir_push_desc_ubo_fully_promoted(
          nir, set_layouts, set_layout_count, &shader_data->bind_map);
+
+   /* Only detected clearing compute shaders, these are the only problematic
+    * cases we're aware of.
+    */
+   if (nir->info.stage == MESA_SHADER_COMPUTE)
+      shader_data->bind_map.inferred_behavior = anv_nir_clear_shader_analysis(nir);
 }
 
 static uint32_t

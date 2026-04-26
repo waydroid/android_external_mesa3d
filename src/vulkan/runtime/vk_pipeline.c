@@ -1739,7 +1739,7 @@ vk_graphics_pipeline_compile_shaders(struct vk_device *device,
 
          if ((compile_info->part_stages[p] & VK_SHADER_STAGE_MESH_BIT_EXT) &&
              !(all_stages & VK_SHADER_STAGE_TASK_BIT_EXT))
-            shader_flags = VK_SHADER_CREATE_NO_TASK_SHADER_BIT_EXT;
+            shader_flags |= VK_SHADER_CREATE_NO_TASK_SHADER_BIT_EXT;
 
          VkShaderStageFlags next_stage;
          if (stage->stage == MESA_SHADER_FRAGMENT) {

@@ -160,6 +160,8 @@ void anv_apply_per_prim_attr_wa(struct nir_shader *ms_nir,
                                 struct nir_shader *fs_nir,
                                 struct anv_device *device);
 
+enum anv_pipeline_behavior anv_nir_clear_shader_analysis(nir_shader *shader);
+
 #ifdef __cplusplus
 }
 #endif

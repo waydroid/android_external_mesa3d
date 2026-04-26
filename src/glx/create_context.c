@@ -98,10 +98,11 @@ glXCreateContextAttribsARB(Display *dpy, GLXFBConfig config,
       attrib_list = malloc(sizeof(int) * num_attribs * 2);
 
       uint8_t clear_ctx_reset_isolation_bit = false;
+#if defined(GLX_DIRECT_RENDERING) && (!defined(GLX_USE_APPLEGL) || defined(GLX_USE_APPLE))
       dri2GalliumConfigQueryb(psc->frontend_screen,
                               "glx_clear_context_reset_isolation_bit",
                               &clear_ctx_reset_isolation_bit);
-
+#endif
       for (unsigned i = 0; i < num_attribs; i++) {
          attrib_list[i * 2] = orig_attrib_list[i * 2];
          if (clear_ctx_reset_isolation_bit &&

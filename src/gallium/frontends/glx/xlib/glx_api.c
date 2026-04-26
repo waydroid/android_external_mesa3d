@@ -1236,6 +1236,8 @@ glXMakeContextCurrent( Display *dpy, GLXDrawable draw,
    }
    else if (!ctx && !draw && !read) {
       /* release current context w/out assigning new one. */
+      if (current)
+         current->currentDpy = NULL;
       XMesaMakeCurrent2( NULL, NULL, NULL );
       SetCurrentContext(NULL);
       return True;

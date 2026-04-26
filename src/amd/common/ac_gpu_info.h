@@ -229,6 +229,7 @@ struct radeon_info {
    bool has_attr_ring_wait_bug;
    bool cp_dma_supports_sparse;
    bool has_vrs_ds_export_bug;
+   bool has_vrs_export_bug;
    bool has_taskmesh_indirect0_bug;
    bool sdma_supports_sparse;      /* Whether SDMA can safely access sparse resources. */
    bool sdma_supports_compression; /* Whether SDMA supports DCC and HTILE. */

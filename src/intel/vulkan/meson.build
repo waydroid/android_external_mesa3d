@@ -175,6 +175,7 @@ libanv_files = files(
   'anv_measure.h',
   'anv_nir.h',
   'anv_nir_apply_pipeline_layout.c',
+  'anv_nir_clear_shader_analysis.c',
   'anv_nir_compute_push_layout.c',
   'anv_nir_lower_driver_values.c',
   'anv_nir_lower_multiview.c',

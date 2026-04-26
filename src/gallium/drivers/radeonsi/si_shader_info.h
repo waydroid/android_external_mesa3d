@@ -205,6 +205,8 @@ union si_ps_input_info {
 struct si_shader_variant_info {
    uint32_t vs_output_ps_input_cntl[NUM_TOTAL_VARYING_SLOTS];
    union si_ps_input_info ps_inputs[SI_NUM_INTERP];
+   uint32_t spi_shader_col_format;
+   uint8_t spi_shader_z_format;
    uint8_t num_ps_inputs;
    uint8_t num_ps_per_primitive_inputs;
    uint8_t num_ps_maybe_per_primitive_inputs;

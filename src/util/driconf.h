@@ -207,6 +207,10 @@
    DRI_CONF_OPT_B(allow_glsl_120_subset_in_110, def, \
                   "Allow a subset of GLSL 1.20 in GLSL 1.10 as needed by SPECviewperf13")
 
+#define DRI_CONF_ALLOW_GLSL_EMBEDDED_STRUCTURE_DECLARATIONS(def) \
+   DRI_CONF_OPT_B(allow_glsl_embedded_structure_declarations, def, \
+                  "Allow embedded structure declarations again in GLSL 1.20+")
+
 #define DRI_CONF_ALLOW_GLSL_BUILTIN_CONST_EXPRESSION(def) \
    DRI_CONF_OPT_B(allow_glsl_builtin_const_expression, def, \
                   "Allow builtins as part of constant expressions")
@@ -254,6 +258,9 @@
 #define DRI_CONF_GLTHREAD_NOP_CHECK_FRAMEBUFFER_STATUS(def) \
    DRI_CONF_OPT_B(glthread_nop_check_framebuffer_status, def, \
                   "glthread always returns GL_FRAMEBUFFER_COMPLETE to prevent synchronization.")
+
+#define DRI_CONF_FORCE_EXPLICIT_UNIFORM_LOC_ZERO() \
+   DRI_CONF_OPT_S_NODEF(force_explicit_uniform_loc_zero, "Forces an explicit uniform location of zero for the uniform.")
 
 #define DRI_CONF_FORCE_GL_VENDOR() \
    DRI_CONF_OPT_S_NODEF(force_gl_vendor, "Override GPU vendor string.")
@@ -932,6 +939,14 @@
 #define DRI_CONF_ANV_DISABLE_DRM_AUX_MODIFIERS(def) \
    DRI_CONF_OPT_B(anv_disable_drm_ccs_modifiers, def, \
                   "Disable DRM CCS modifier usage")
+
+#define DRI_CONF_ANV_BARRIER_POST_UNTYPED_CLEAR_SHADER(def) \
+   DRI_CONF_OPT_B(anv_barrier_post_untyped_clear_shader, def, \
+                  "Insert pipeline barriers post clearing shader on untyped data")
+
+#define DRI_CONF_ANV_BARRIER_POST_TYPED_CLEAR_SHADER(def) \
+   DRI_CONF_OPT_B(anv_barrier_post_typed_clear_shader, def, \
+                  "Insert pipeline barriers post clearing shader on typed data")
 
 /**
  * \brief HASVK specific configuration options

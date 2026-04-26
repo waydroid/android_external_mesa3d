@@ -2258,10 +2258,10 @@ clone_ssa_impl(struct linkage_info *linkage, nir_builder *b, nir_def *ssa)
                 NIR_MAX_VEC_COMPONENTS);
       }
 
+      clone = nir_builder_alu_instr_finish_and_insert(b, alu_clone);
+
       alu_clone->def.num_components = alu->def.num_components;
       alu_clone->def.bit_size = alu->def.bit_size;
-
-      clone = nir_builder_alu_instr_finish_and_insert(b, alu_clone);
 
       /* nir_builder_alu_instr_finish_and_insert overwrites fp_math_ctrl. */
       alu_clone->fp_math_ctrl = alu->fp_math_ctrl;

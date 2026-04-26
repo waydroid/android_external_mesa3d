@@ -159,5 +159,6 @@ void si_get_late_shader_variant_info(struct si_shader *shader, struct si_shader_
                                      nir_shader *nir);
 void si_set_spi_ps_input_config_for_separate_prolog(struct si_shader *shader);
 void si_fixup_spi_ps_input_config(struct si_shader *shader);
+void si_shader_update_spi_shader_formats(struct si_shader *shader, nir_shader *nir);
 
 #endif

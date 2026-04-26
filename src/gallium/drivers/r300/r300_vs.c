@@ -183,6 +183,7 @@ void r300_translate_vertex_shader(struct r300_context *r300,
     compiler.code = &vs->code;
     compiler.UserData = vs;
     compiler.Base.debug = &r300->context.debug;
+    compiler.Base.is_r400 = r300->screen->caps.is_r400;
     compiler.Base.is_r500 = r300->screen->caps.is_r500;
     compiler.Base.disable_optimizations = DBG_ON(r300, DBG_NO_OPT);
     /* Only R500 has few IEEE math opcodes. */

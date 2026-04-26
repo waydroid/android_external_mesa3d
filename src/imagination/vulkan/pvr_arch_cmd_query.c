@@ -170,9 +170,8 @@ void PVR_PER_ARCH(CmdBeginQuery)(VkCommandBuffer commandBuffer,
    /* Occlusion queries can't be nested. */
    assert(!state->vis_test_enabled);
 
-   if (state->current_sub_cmd) {
-      assert(state->current_sub_cmd->type == PVR_SUB_CMD_TYPE_GRAPHICS);
-
+   if (state->current_sub_cmd &&
+       state->current_sub_cmd->type == PVR_SUB_CMD_TYPE_GRAPHICS) {
       if (!state->current_sub_cmd->gfx.query_pool) {
          state->current_sub_cmd->gfx.query_pool = pool;
       } else if (state->current_sub_cmd->gfx.query_pool != pool) {

@@ -138,6 +138,42 @@ vn_wsi_init(struct vn_physical_device *physical_dev)
        physical_dev->renderer_driver_version <
           VN_MAKE_NVIDIA_VERSION(590, 48, 1, 0));
 
+   /* Normally Venus on Nvidia GPUs takes the prime blit path. The exception
+    * is when KWin or any wlroots based compositors are used:
+    * 1. KWin and wlroots based compositors always add LINEAR to dmabuf
+    *    feedback tranches assuming LINEAR can be handled by GPU drivers.
+    * 2. Venus + Virgl only sees the compositor injected LINEAR mod since
+    *    Virgl doesn't support explicit modifiers on the driver side.
+    * 3. Nvidia GPUs doesn't support LINEAR color attachment, and it's too
+    *    late to reject LINEAR mod when the native image path has already
+    *    been taken instead of the prime image path.
+    *
+    * Gamescope requires VK_EXT_physical_device_drm and its runtime doesn't
+    * use standard WSI extensions, so venus can spoof without impacting it.
+    */
+   struct vk_properties *props = &physical_dev->base.vk.properties;
+   const bool is_nvidia = props->vendorID == 0x10de;
+   const char *app_name = physical_dev->instance->base.vk.app_info.app_name;
+   const bool is_gamescope = app_name && strcmp(app_name, "gamescope") == 0;
+   if (is_nvidia && !is_gamescope) {
+      /* Fail same_gpu check on x11. See wsi_device_matches_drm_fd. */
+      physical_dev->base.vk.supported_extensions.EXT_pci_bus_info = false;
+      props->pciDomain = 0;
+      props->pciBus = 0;
+      props->pciDevice = 0;
+      props->pciFunction = 0;
+
+      /* Fail same_gpu check on wayland. See wsi_wl_display_init. */
+      physical_dev->base.vk.supported_extensions.EXT_physical_device_drm =
+         false;
+      props->drmHasPrimary = false;
+      props->drmHasRender = true;
+      props->drmPrimaryMajor = 0;
+      props->drmPrimaryMinor = 0;
+      props->drmRenderMajor = 0;
+      props->drmRenderMinor = 0;
+   }
+
    const VkAllocationCallbacks *alloc =
       &physical_dev->instance->base.vk.alloc;
    VkResult result = wsi_device_init(

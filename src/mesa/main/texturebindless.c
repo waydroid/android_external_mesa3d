@@ -237,9 +237,9 @@ new_texture_handle(struct gl_context *ctx, struct gl_texture_object *texObj,
 
       /* TODO: Clarify the interaction of ARB_bindless_texture and EXT_texture_sRGB_decode */
       view = st_get_texture_sampler_view_from_stobj(st, texObj, sampObj, 0,
-                                                    false);
+                                                    false, 0, NULL);
    } else {
-      view = st_get_buffer_sampler_view_from_stobj(st, texObj);
+      view = st_get_buffer_sampler_view_from_stobj(st, texObj, 0, NULL);
       sampler.unnormalized_coords = 0;
    }
 

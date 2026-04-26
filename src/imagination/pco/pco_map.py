@@ -995,7 +995,7 @@ encode_map(O_FRED,
          ('red_type', OM_FRED_TYPE),
          ('pwen', ('!pco_ref_is_null', DEST(2))),
          ('s0neg', (RM_NEG, SRC(0))),
-         ('s0abs', (RM_NEG, SRC(0)))
+         ('s0abs', (RM_ABS, SRC(0)))
       ])
    ],
    op_ref_maps=[('0', [['w0', '_'], ['w1', '_'], ['p0', '_']], ['s0', ['s3', '_'], 'imm'])]

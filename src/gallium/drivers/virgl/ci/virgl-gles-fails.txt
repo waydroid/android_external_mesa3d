@@ -203,3 +203,7 @@ dEQP-GLES31.functional.primitive_bounding_box.triangles.global_state.vertex_tess
 dEQP-GLES31.functional.primitive_bounding_box.wide_lines.global_state.vertex_tessellation_geometry_fragment.fbo_bbox_smaller,Fail
 dEQP-GLES31.functional.srgb_texture_decode.skip_decode.sr8.using_sampler,Fail
 KHR-GL32.framebuffer_blit.multisampled_to_singlesampled_blit_depth_config_test,Fail
+
+# !40444
+KHR-GL32.packed_depth_stencil.blit.depth24_stencil8,Fail
+KHR-GL32.packed_depth_stencil.blit.depth32f_stencil8,Fail

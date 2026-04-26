@@ -73,11 +73,6 @@
 #include "vk_sampler.h"
 #include "vk_util.h"
 
-/* Amount of padding required for VkBuffers to ensure we don't read beyond
- * a page boundary.
- */
-#define PVR_BUFFER_MEMORY_PADDING_SIZE 4
-
 /** Gets the amount of memory to allocate per-core for a tile buffer. */
 static uint32_t
 pvr_get_tile_buffer_size_per_core(const struct pvr_device *device)

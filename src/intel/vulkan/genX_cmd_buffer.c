@@ -26,6 +26,7 @@
 
 #include "anv_private.h"
 #include "anv_measure.h"
+#include "vk_common_entrypoints.h"
 #include "vk_render_pass.h"
 #include "vk_synchronization.h"
 #include "vk_util.h"
@@ -3917,12 +3918,12 @@ genX(BeginCommandBuffer)(
          vk_get_command_buffer_inheritance_as_rendering_resume(cmd_buffer->vk.level,
                                                                pBeginInfo,
                                                                gcbiar_data);
+      const VkCommandBufferInheritanceRenderingInfo *inheritance_info =
+         vk_get_command_buffer_inheritance_rendering_info(cmd_buffer->vk.level,
+                                                          pBeginInfo);
       if (resume_info != NULL) {
          genX(CmdBeginRendering)(commandBuffer, resume_info);
       } else {
-         const VkCommandBufferInheritanceRenderingInfo *inheritance_info =
-            vk_get_command_buffer_inheritance_rendering_info(cmd_buffer->vk.level,
-                                                             pBeginInfo);
          assert(inheritance_info);
 
          gfx->rendering_flags = inheritance_info->flags;
@@ -3949,6 +3950,16 @@ genX(BeginCommandBuffer)(
 
          cmd_buffer->state.gfx.dirty |= ANV_CMD_DIRTY_RENDER_AREA |
                                         ANV_CMD_DIRTY_RENDER_TARGETS;
+      }
+
+      const VkRenderingAttachmentLocationInfo *att_loc_info =
+         inheritance_info ?
+         vk_find_struct_const(inheritance_info->pNext,
+                              RENDERING_ATTACHMENT_LOCATION_INFO) :
+         NULL;
+      if (att_loc_info != NULL) {
+         vk_common_CmdSetRenderingAttachmentLocationsKHR(
+            commandBuffer, att_loc_info);
       }
    }
 

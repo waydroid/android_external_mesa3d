@@ -4511,6 +4511,8 @@ instr_can_be_predicated(nir_instr *instr)
       case nir_intrinsic_demote_if:
       case nir_intrinsic_terminate:
       case nir_intrinsic_terminate_if:
+      case nir_intrinsic_vote_all:
+      case nir_intrinsic_vote_any:
          return false;
       default:
          return true;

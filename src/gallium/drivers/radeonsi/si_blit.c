@@ -26,6 +26,9 @@ enum
 
 void si_blitter_begin(struct si_context *sctx, enum si_blitter_op op)
 {
+   util_blitter_save_vertex_buffers(sctx->blitter, sctx->vertex_buffer,
+                                    sctx->vertex_elements->num_vertex_buffers);
+   util_blitter_save_vertex_elements(sctx->blitter, sctx->vertex_elements);
    util_blitter_save_vertex_shader(sctx->blitter, sctx->shader.vs.cso);
    util_blitter_save_tessctrl_shader(sctx->blitter, sctx->shader.tcs.cso);
    util_blitter_save_tesseval_shader(sctx->blitter, sctx->shader.tes.cso);
@@ -34,6 +37,7 @@ void si_blitter_begin(struct si_context *sctx, enum si_blitter_op op)
    util_blitter_save_so_targets(sctx->blitter, sctx->streamout.num_targets,
                                 (struct pipe_stream_output_target **)sctx->streamout.targets,
                                 sctx->streamout.output_prim);
+   util_blitter_save_viewport(sctx->blitter, &sctx->viewports.states[0]);
    util_blitter_save_rasterizer(sctx->blitter, sctx->queued.named.rasterizer);
 
    if (op & SI_SAVE_FRAGMENT_STATE) {
@@ -76,6 +80,9 @@ void si_blitter_begin(struct si_context *sctx, enum si_blitter_op op)
    /* Force-disable fbfetch because there are unsolvable recursion problems with u_blitter. */
    si_force_disable_ps_colorbuf0_slot(sctx);
 
+   /* This disables streamout queries. See si_get_streamout_enable_state. */
+   si_mark_atom_dirty(sctx, &sctx->atoms.s.streamout_enable);
+
    sctx->blitter_running = true;
 }
 
@@ -103,6 +110,9 @@ void si_blitter_end(struct si_context *sctx)
 
    sctx->vertex_buffers_dirty = sctx->num_vertex_elements > 0;
    si_mark_atom_dirty(sctx, &sctx->atoms.s.gfx_shader_pointers);
+
+   /* This re-enables streamout queries. */
+   si_mark_atom_dirty(sctx, &sctx->atoms.s.streamout_enable);
 
    /* We force-disabled fbfetch for u_blitter, so recompute the state. */
    si_update_ps_colorbuf0_slot(sctx);

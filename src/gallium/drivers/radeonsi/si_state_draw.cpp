@@ -2600,7 +2600,6 @@ static void si_draw_rectangle(struct blitter_context *blitter, void *vertex_elem
 
    if (MAX2(abs(x1), abs(x2)) > INT16_MAX || MAX2(abs(y1), abs(y2)) > INT16_MAX) {
       /* Fallback when coordinates can't fit in int16. */
-      util_blitter_save_vertex_elements(sctx->blitter, sctx->vertex_elements);
       util_blitter_draw_rectangle(blitter, vertex_elements_cso, get_vs, x1, y1, x2, y2,
                                   depth, num_instances, type, attrib);
       return;

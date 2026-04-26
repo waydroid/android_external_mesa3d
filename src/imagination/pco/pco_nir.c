@@ -448,7 +448,7 @@ static void pco_nir_opt(pco_ctx *ctx, nir_shader *nir, bool algebraic)
    do {
       progress = false;
 
-      if (count > 1000) {
+      if (count++ > 1000) {
          printf("WARNING! Infinite opt loop!\n");
          break;
       }
@@ -827,8 +827,9 @@ void pco_lower_nir(pco_ctx *ctx, nir_shader *nir, pco_data *data)
 
    nir_move_options move_options = nir_move_load_global | nir_move_load_ubo |
                                    nir_move_load_ssbo | nir_move_load_input |
-                                   nir_move_load_frag_coord |
-                                   nir_intrinsic_load_uniform;
+                                   nir_move_load_frag_coord | nir_move_alu |
+                                   nir_move_comparisons | nir_move_copies;
+
    NIR_PASS(_, nir, nir_opt_sink, move_options);
    NIR_PASS(_, nir, nir_opt_move, move_options);
 

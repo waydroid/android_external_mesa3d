@@ -242,6 +242,7 @@ stw_cleanup(void)
       return;
    }
 
+   free(stw_dev->st_options.force_explicit_uniform_loc_zero);
    free(stw_dev->st_options.force_gl_vendor);
    free(stw_dev->st_options.force_gl_renderer);
    free(stw_dev->st_options.mesa_extension_override);

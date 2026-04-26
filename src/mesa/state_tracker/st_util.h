@@ -104,6 +104,14 @@ st_point_size_per_vertex(struct gl_context *ctx)
                       VARYING_BIT_PSIZ);
       }
    }
+   const struct gl_program *meshProg = ctx->MeshProgram._Current;
+   if (meshProg) {
+      if (meshProg->info.outputs_written &
+          VARYING_BIT_PSIZ) {
+         /* generated program which emits point size */
+         return true;
+      }
+   }
    return false;
 }
 

@@ -1232,6 +1232,7 @@ vk_render_pass_state_init(struct vk_render_pass_state *rp,
    *rp = (struct vk_render_pass_state) {
       .depth_attachment_format = VK_FORMAT_UNDEFINED,
       .stencil_attachment_format = VK_FORMAT_UNDEFINED,
+      .attachments = MESA_VK_RP_ATTACHMENT_INFO_INVALID,
    };
 
    if (info->renderPass != VK_NULL_HANDLE && driver_rp != NULL) {
@@ -1269,7 +1270,6 @@ vk_render_pass_state_init(struct vk_render_pass_state *rp,
     */
    if (info->renderPass == VK_NULL_HANDLE &&
        !(lib & VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT)) {
-      rp->attachments = MESA_VK_RP_ATTACHMENT_INFO_INVALID;
       return;
    }
 
@@ -1302,6 +1302,8 @@ vk_render_pass_state_init(struct vk_render_pass_state *rp,
 
       rp->depth_stencil_attachment_samples = asc_info->depthStencilAttachmentSamples;
    }
+
+   rp->attachments = 0;
 
    for (uint32_t i = 0; i < r_info->colorAttachmentCount; i++) {
       if (rp->color_attachment_formats[i] != VK_FORMAT_UNDEFINED)

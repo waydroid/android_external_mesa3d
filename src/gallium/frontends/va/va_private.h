@@ -664,10 +664,8 @@ PROC void vlVaHandleSliceParameterBufferAV1(vlVaContext *context, vlVaBuffer *bu
 #undef TAIL
 #undef TAIL_S
 
-VAStatus vlVaHandleEncBufferType(vlVaDriver *drv, vlVaContext *context, vlVaBuffer *buf);
-void vlVaHandleVAEncMiscParameterTypeQualityLevel(struct pipe_enc_quality_modes *p, vlVaQualityBits *in);
-
 #if VIDEO_CODEC_H264ENC
+#define HAS_ENCODE
 #define PROC
 #define TAIL
 #else
@@ -688,6 +686,7 @@ PROC VAStatus vlVaHandleVAEncMiscParameterTypeHRDH264(vlVaContext *context, VAEn
 #undef TAIL
 
 #if VIDEO_CODEC_H265ENC
+#define HAS_ENCODE
 #define PROC
 #define TAIL
 #else
@@ -709,6 +708,7 @@ PROC VAStatus vlVaHandleVAEncMiscParameterTypeTemporalLayerHEVC(vlVaContext *con
 
 #if VA_CHECK_VERSION(1, 16, 0)
 #if VIDEO_CODEC_AV1ENC
+#define HAS_ENCODE
 #define PROC
 #define TAIL
 #else
@@ -727,4 +727,18 @@ PROC VAStatus vlVaHandleVAEncSliceParameterBufferTypeAV1(vlVaDriver *drv, vlVaCo
 #undef PROC
 #undef TAIL
 #endif
+
+#ifdef HAS_ENCODE
+#define PROC
+#define TAIL
+#else
+#define PROC static inline
+#define TAIL {return VA_STATUS_ERROR_UNIMPLEMENTED;}
+#endif
+PROC VAStatus vlVaHandleEncBufferType(vlVaDriver *drv, vlVaContext *context, vlVaBuffer *buf) TAIL;
+#undef PROC
+#undef TAIL
+
+void vlVaHandleVAEncMiscParameterTypeQualityLevel(struct pipe_enc_quality_modes *p, vlVaQualityBits *in);
+
 #endif //VA_PRIVATE_H

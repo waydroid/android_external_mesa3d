@@ -409,16 +409,16 @@ radv_rt_nir_to_asm(struct radv_device *device, struct vk_pipeline_cache *cache,
    stage->info.inline_push_constant_mask = stage->args.ac.inline_push_const_mask;
    stage->info.type = radv_is_traversal_shader(stage->nir) ? RADV_SHADER_TYPE_RT_TRAVERSAL : RADV_SHADER_TYPE_DEFAULT;
 
-   /* Move ray tracing system values to the top that are set by rt_trace_ray
-    * to prevent them from being overwritten by other rt_trace_ray calls.
-    */
-   NIR_PASS(_, stage->nir, move_rt_instructions);
-
    uint32_t num_resume_shaders = 0;
    nir_shader **resume_shaders = NULL;
    void *mem_ctx = ralloc_context(NULL);
 
    if (stage->stage != MESA_SHADER_INTERSECTION && mode == RADV_RT_LOWERING_MODE_CPS) {
+      /* Move ray tracing system values to the top that are set by rt_trace_ray
+       * to prevent them from being overwritten by other rt_trace_ray calls.
+       */
+      NIR_PASS(_, stage->nir, move_rt_instructions);
+
       nir_builder b = nir_builder_at(nir_after_impl(nir_shader_get_entrypoint(stage->nir)));
       nir_rt_return_amd(&b);
 
@@ -541,6 +541,7 @@ radv_rt_nir_to_asm(struct radv_device *device, struct vk_pipeline_cache *cache,
    if (dump_shader)
       simple_mtx_unlock(&instance->shader_dump_mtx);
 
+   ralloc_free(mem_ctx);
    free(binary);
 
    *out_shader = shader;

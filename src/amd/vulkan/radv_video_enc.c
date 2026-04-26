@@ -1095,7 +1095,7 @@ radv_enc_slice_header(struct radv_cmd_buffer *cmd_buffer, const VkVideoEncodeInf
       radv_enc_code_ue(cmd_buffer, 6);
       break;
    }
-   radv_enc_code_ue(cmd_buffer, 0x0);
+   radv_enc_code_ue(cmd_buffer, pic->pic_parameter_set_id);
 
    unsigned int max_frame_num_bits = sps->log2_max_frame_num_minus4 + 4;
    radv_enc_code_fixed_bits(cmd_buffer, pic->frame_num % (1 << max_frame_num_bits), max_frame_num_bits);

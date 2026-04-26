@@ -61,7 +61,8 @@ disable_rb_aux_buffer(struct iris_context *ice,
       struct pipe_surface *surf = &cso_fb->base.cbufs[i];
       struct iris_resource *rb_res = (void *) surf->texture;
 
-      if (rb_res->bo == tex_res->bo &&
+      if (rb_res != NULL &&
+          rb_res->bo == tex_res->bo &&
           surf->level >= min_level &&
           surf->level < min_level + num_levels) {
          found = draw_aux_buffer_disabled[i] = true;

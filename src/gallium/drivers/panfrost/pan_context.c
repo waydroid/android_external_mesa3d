@@ -248,7 +248,7 @@ panfrost_set_shader_images(struct pipe_context *pctx,
          pipe_resource_reference(&ctx->images[shader][i].resource, NULL);
       }
 
-      ctx->image_mask[shader] &= ~(((1ull << count) - 1) << start_slot);
+      ctx->image_mask[shader] &= ~(BITFIELD64_MASK(count) << start_slot);
       return;
    }
 
@@ -273,7 +273,7 @@ panfrost_set_shader_images(struct pipe_context *pctx,
    /* Bind start_slot...start_slot+count */
    for (int i = 0; i < count; i++) {
       const struct pipe_image_view *image = &iviews[i];
-      SET_BIT(ctx->image_mask[shader], 1 << (start_slot + i), image->resource);
+      SET_BIT(ctx->image_mask[shader], BITFIELD64_BIT(start_slot + i), image->resource);
       if (!image->resource) {
          util_copy_image_view(&ctx->images[shader][start_slot + i], NULL);
          continue;
@@ -283,7 +283,7 @@ panfrost_set_shader_images(struct pipe_context *pctx,
 
    /* Unbind start_slot+count...start_slot+count+unbind_num_trailing_slots */
    for (int i = 0; i < unbind_num_trailing_slots; i++) {
-      SET_BIT(ctx->image_mask[shader], 1 << (start_slot + count + i), NULL);
+      SET_BIT(ctx->image_mask[shader], BITFIELD64_BIT(start_slot + count + i), NULL);
       util_copy_image_view(&ctx->images[shader][start_slot + count + i], NULL);
    }
 }

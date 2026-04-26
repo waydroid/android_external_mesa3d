@@ -35,6 +35,9 @@ enum bi_swizzle {
    BI_SWIZZLE_H10 = 2,
    BI_SWIZZLE_H11 = 3,
 
+   /* Identity swizzle */
+   BI_SWIZZLE_NONE = BI_SWIZZLE_H01,
+
    /* 8-bit swizzle equivalents */
    BI_SWIZZLE_B0101 = BI_SWIZZLE_H00,
    BI_SWIZZLE_B0123 = BI_SWIZZLE_H01,

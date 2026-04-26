@@ -159,11 +159,12 @@ vtn_mediump_downconvert_value(struct vtn_builder *b, struct vtn_ssa_value *src)
    if (!src)
       return src;
 
-   struct vtn_ssa_value *srcmp = vtn_create_ssa_value(b, src->type);
-
    if (src->transposed) {
-      srcmp->transposed = vtn_mediump_downconvert_value(b, src->transposed);
+      struct vtn_ssa_value *transposed =
+         vtn_mediump_downconvert_value(b, src->transposed);
+      return vtn_ssa_transpose(b, transposed);
    } else {
+      struct vtn_ssa_value *srcmp = vtn_create_ssa_value(b, src->type);
       enum glsl_base_type base_type = glsl_get_base_type(src->type);
 
       if (glsl_type_is_vector_or_scalar(src->type)) {
@@ -173,9 +174,8 @@ vtn_mediump_downconvert_value(struct vtn_builder *b, struct vtn_ssa_value *src)
          for (int i = 0; i < glsl_get_matrix_columns(src->type); i++)
             srcmp->elems[i]->def = vtn_mediump_downconvert(b, base_type, src->elems[i]->def);
       }
+      return srcmp;
    }
-
-   return srcmp;
 }
 
 static struct vtn_ssa_value *
@@ -280,12 +280,9 @@ vtn_convert_op_dst_type(SpvOp opcode)
 nir_op
 vtn_nir_alu_op_for_spirv_opcode(struct vtn_builder *b,
                                 SpvOp opcode, bool *swap, bool *exact,
-                                const glsl_type *src_type,
-                                const glsl_type *dst_type)
+                                unsigned conv_src_bit_size,
+                                unsigned conv_dst_bit_size)
 {
-   const unsigned src_bit_size = glsl_get_bit_size(src_type);
-   const unsigned dst_bit_size = glsl_get_bit_size(dst_type);
-
    /* Indicates that the first two arguments should be swapped.  This is
     * used for implementing greater-than and less-than-or-equal.
     */
@@ -382,8 +379,12 @@ vtn_nir_alu_op_for_spirv_opcode(struct vtn_builder *b,
    case SpvOpConvertUToF:
    case SpvOpSConvert:
    case SpvOpFConvert: {
-      nir_alu_type src_type = vtn_convert_op_src_type(opcode) | src_bit_size;
-      nir_alu_type dst_type = vtn_convert_op_dst_type(opcode) | dst_bit_size;
+      vtn_fail_if(conv_src_bit_size == 0,
+                  "Need src bit_size to translate from SPIR-V convert opcodes to NIR.");
+      vtn_fail_if(conv_dst_bit_size == 0,
+                  "Need dst bit_size to translate from SPIR-V convert opcodes to NIR.");
+      nir_alu_type src_type = vtn_convert_op_src_type(opcode) | conv_src_bit_size;
+      nir_alu_type dst_type = vtn_convert_op_dst_type(opcode) | conv_dst_bit_size;
       return nir_type_conversion_op(src_type, dst_type, nir_rounding_mode_undef);
    }
 
@@ -549,17 +550,26 @@ vtn_mediump_upconvert(struct vtn_builder *b, enum glsl_base_type base_type, nir_
    }
 }
 
-void
+struct vtn_ssa_value *
 vtn_mediump_upconvert_value(struct vtn_builder *b, struct vtn_ssa_value *value)
 {
    enum glsl_base_type base_type = glsl_get_base_type(value->type);
 
+   if (value->transposed) {
+      struct vtn_ssa_value *transposed =
+         vtn_mediump_upconvert_value(b, value->transposed);
+      return vtn_ssa_transpose(b, transposed);
+   }
+
+   struct vtn_ssa_value *value_full = vtn_create_ssa_value(b, value->type);
    if (glsl_type_is_vector_or_scalar(value->type)) {
-      value->def = vtn_mediump_upconvert(b, base_type, value->def);
+      value_full->def = vtn_mediump_upconvert(b, base_type, value->def);
    } else {
       for (int i = 0; i < glsl_get_matrix_columns(value->type); i++)
-         value->elems[i]->def = vtn_mediump_upconvert(b, base_type, value->elems[i]->def);
+         value_full->elems[i]->def = vtn_mediump_upconvert(b, base_type, value->elems[i]->def);
    }
+
+   return value_full;
 }
 
 static nir_def *
@@ -747,7 +757,7 @@ vtn_handle_alu(struct vtn_builder *b, SpvOp opcode,
       struct vtn_ssa_value *dest = vtn_handle_matrix_alu(b, opcode, vtn_src[0], vtn_src[1]);
 
       if (mediump_16bit)
-         vtn_mediump_upconvert_value(b, dest);
+         dest = vtn_mediump_upconvert_value(b, dest);
 
       vtn_push_ssa_value(b, w[2], dest);
       b->nb.fp_math_ctrl = b->exact ? nir_fp_exact : nir_fp_fast_math;
@@ -909,8 +919,7 @@ vtn_handle_alu(struct vtn_builder *b, SpvOp opcode,
       bool swap;
       bool unused_exact;
       nir_op op = vtn_nir_alu_op_for_spirv_opcode(b, opcode, &swap,
-                                                  &unused_exact,
-                                                  vtn_src[0]->type, dest_type);
+                                                  &unused_exact, 0, 0);
 
       if (swap) {
          nir_def *tmp = src[0];
@@ -986,8 +995,7 @@ vtn_handle_alu(struct vtn_builder *b, SpvOp opcode,
    case SpvOpShiftRightLogical: {
       bool swap;
       bool exact;
-      nir_op op = vtn_nir_alu_op_for_spirv_opcode(b, opcode, &swap, &exact,
-                                                  vtn_src[0]->type, dest_type);
+      nir_op op = vtn_nir_alu_op_for_spirv_opcode(b, opcode, &swap, &exact, 0, 0);
 
       assert(!exact);
 
@@ -1046,7 +1054,8 @@ vtn_handle_alu(struct vtn_builder *b, SpvOp opcode,
       bool exact;
       nir_op op = vtn_nir_alu_op_for_spirv_opcode(b, opcode, &swap,
                                                   &exact,
-                                                  vtn_src[0]->type, dest_type);
+                                                  glsl_get_bit_size(vtn_src[0]->type),
+                                                  glsl_get_bit_size(dest_type));
 
       if (swap) {
          nir_def *tmp = src[0];
@@ -1096,7 +1105,7 @@ vtn_handle_alu(struct vtn_builder *b, SpvOp opcode,
    }
 
    if (mediump_16bit)
-      vtn_mediump_upconvert_value(b, dest);
+      dest = vtn_mediump_upconvert_value(b, dest);
    vtn_push_ssa_value(b, w[2], dest);
 
    b->nb.fp_math_ctrl = b->exact ? nir_fp_exact : nir_fp_fast_math;

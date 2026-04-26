@@ -4678,14 +4678,6 @@ tu_pipeline_builder_init_graphics(
 
       tu_fill_render_pass_state(&rp_state, pass, subpass);
 
-      for (unsigned i = 0; i < subpass->input_count; i++) {
-         /* Input attachments stored in GMEM must be loaded with unscaled
-          * FragCoord.
-          */
-         if (subpass->input_attachments[i].patch_input_gmem)
-            builder->unscaled_input_fragcoord |= 1u << i;
-      }
-
       if (subpass->feedback_loop_color) {
          rp_flags |=
             VK_PIPELINE_CREATE_2_COLOR_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT;
@@ -4716,7 +4708,8 @@ tu_pipeline_builder_init_graphics(
          /* Input attachments stored in GMEM must be loaded with unscaled
           * FragCoord.
           */
-         if (subpass->input_attachments[i].patch_input_gmem)
+         if (subpass->input_attachments[i].attachment != VK_ATTACHMENT_UNUSED &&
+             subpass->input_attachments[i].patch_input_gmem)
             builder->unscaled_input_fragcoord |= 1u << i;
       }
 

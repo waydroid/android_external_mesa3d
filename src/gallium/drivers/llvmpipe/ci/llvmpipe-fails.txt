@@ -93,7 +93,6 @@ spec@!opengl 1.1@polygon-mode-offset@config 4: Expected white pixel on right edg
 spec@!opengl 1.1@polygon-mode-offset@config 4: Expected white pixel on top edge,Fail
 
 # Seen in https://gitlab.freedesktop.org/mesa/mesa/-/pipelines/1364513
-dEQP-GLES31.functional.shaders.framebuffer_fetch.basic.last_frag_data,Fail
 spec@arb_framebuffer_object@execution@msaa-alpha-to-coverage_alpha-to-one_write-z,Fail
 spec@ovr_multiview@compiler@multiple-num-views-in-single-declaration-mismatch.vert,Fail
 

@@ -39,7 +39,6 @@ static const struct debug_control panvk_debug_options[] = {
    {"noafbc", PANVK_DEBUG_NO_AFBC},
    {"linear", PANVK_DEBUG_LINEAR},
    {"dump", PANVK_DEBUG_DUMP},
-   {"no_known_warn", PANVK_DEBUG_NO_KNOWN_WARN},
    {"cs", PANVK_DEBUG_CS},
    {"copy_gfx", PANVK_DEBUG_COPY_GFX},
    {"force_simultaneous", PANVK_DEBUG_FORCE_SIMULTANEOUS},

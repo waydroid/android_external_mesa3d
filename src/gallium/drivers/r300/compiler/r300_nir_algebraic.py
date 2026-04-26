@@ -53,8 +53,8 @@ r300_nir_prepare_presubtract = [
         (('fadd', -1.0, a), ('fneg', ('fadd', 1.0, ('fneg', a)))),
         # Bias presubtract 1 - 2 * x expects MAD -a 2.0 1.0 form.
         (('ffma', 2.0, ('fneg', a), 1.0), ('ffma', ('fneg', a), 2.0, 1.0)),
-        (('ffma', a, -2.0, 1.0), ('fneg', ('ffma', ('fneg', a), 2.0, 1.0))),
-        (('ffma', -2.0, a, 1.0), ('fneg', ('ffma', ('fneg', a), 2.0, 1.0))),
+        (('ffma', a, -2.0, 1.0), ('ffma', ('fneg', a), 2.0, 1.0)),
+        (('ffma', -2.0, a, 1.0), ('ffma', ('fneg', a), 2.0, 1.0)),
         (('ffma', 2.0, a, -1.0), ('fneg', ('ffma', ('fneg', a), 2.0, 1.0))),
         (('ffma', a, 2.0, -1.0), ('fneg', ('ffma', ('fneg', a), 2.0, 1.0))),
         # x * 2 can be usually folded into output modifier for the previous

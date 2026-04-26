@@ -57,6 +57,13 @@
 #define NUM_RESOLVE_FRAG_SHADERS 5 /* MSAA 2x, 4x, 8x, 16x, 32x */
 #define GET_MSAA_RESOLVE_FS_IDX(nr_samples) (util_logbase2(nr_samples)-1)
 
+enum blitter_fs_clear_color {
+   BLITTER_FS_CLEAR_COL_ALL_CBUF = 0,
+   BLITTER_FS_CLEAR_COL_ONE_CBUF,
+   BLITTER_FS_CLEAR_COL_ONE_CBUF_USE_CONST_BUF,
+   BLITTER_FS_CLEAR_COL_NUM
+};
+
 struct blitter_context_priv
 {
    struct blitter_context base;
@@ -73,7 +80,7 @@ struct blitter_context_priv
 
    /* Fragment shaders. */
    void *fs_empty;
-   void *fs_clear_color[2];
+   void *fs_clear_color[BLITTER_FS_CLEAR_COL_NUM];
 
    /* FS which outputs a color from a texture where
     * the 1st index indicates the texture type / destination type,
@@ -410,17 +417,21 @@ static void bind_fs_empty(struct blitter_context_priv *ctx)
 }
 
 static void bind_fs_clear_color(struct blitter_context_priv *ctx,
-                                bool write_all_cbufs)
+                                enum blitter_fs_clear_color fs)
 {
    struct pipe_context *pipe = ctx->base.pipe;
 
-   if (!ctx->fs_clear_color[write_all_cbufs]) {
+   if (!ctx->fs_clear_color[fs]) {
       assert(!ctx->cached_all_shaders);
-      ctx->fs_clear_color[write_all_cbufs] =
-         util_make_fs_clear_color(pipe, write_all_cbufs);
+      ctx->fs_clear_color[fs] =
+         util_make_fs_clear_color(
+            pipe,
+            fs == BLITTER_FS_CLEAR_COL_ALL_CBUF,
+            fs == BLITTER_FS_CLEAR_COL_ALL_CBUF ||
+               fs == BLITTER_FS_CLEAR_COL_ONE_CBUF_USE_CONST_BUF);
    }
 
-   ctx->bind_fs_state(pipe, ctx->fs_clear_color[write_all_cbufs]);
+   ctx->bind_fs_state(pipe, ctx->fs_clear_color[fs]);
 }
 
 void util_blitter_destroy(struct blitter_context *blitter)
@@ -1333,8 +1344,12 @@ void util_blitter_cache_all_shaders(struct blitter_context *blitter)
 
    ctx->fs_empty = util_make_empty_fragment_shader(pipe);
 
-   ctx->fs_clear_color[0] = util_make_fs_clear_color(pipe, false);
-   ctx->fs_clear_color[1] = util_make_fs_clear_color(pipe, true);
+   ctx->fs_clear_color[BLITTER_FS_CLEAR_COL_ONE_CBUF] =
+      util_make_fs_clear_color(pipe, false, false);
+   ctx->fs_clear_color[BLITTER_FS_CLEAR_COL_ONE_CBUF_USE_CONST_BUF] =
+      util_make_fs_clear_color(pipe, false, true);
+   ctx->fs_clear_color[BLITTER_FS_CLEAR_COL_ALL_CBUF] =
+      util_make_fs_clear_color(pipe, true, true);
 
    ctx->cached_all_shaders = true;
 }
@@ -1543,7 +1558,7 @@ static void util_blitter_clear_custom(struct blitter_context *blitter,
       };
       pipe->set_constant_buffer(pipe, MESA_SHADER_FRAGMENT, blitter->cb_slot,
                                 &cb);
-      bind_fs_clear_color(ctx, true);
+      bind_fs_clear_color(ctx, BLITTER_FS_CLEAR_COL_ALL_CBUF);
    } else {
       bind_fs_empty(ctx);
    }
@@ -2382,7 +2397,7 @@ void util_blitter_clear_render_target(struct blitter_context *blitter,
    /* bind states */
    pipe->bind_blend_state(pipe, ctx->blend[PIPE_MASK_RGBA][0]);
    pipe->bind_depth_stencil_alpha_state(pipe, ctx->dsa_keep_depth_stencil);
-   bind_fs_clear_color(ctx, false);
+   bind_fs_clear_color(ctx, BLITTER_FS_CLEAR_COL_ONE_CBUF_USE_CONST_BUF);
 
    /* set a framebuffer state */
    pipe_surface_size(dstsurf, &fb_state.width, &fb_state.height);
@@ -2530,7 +2545,7 @@ void util_blitter_custom_depth_stencil(struct blitter_context *blitter,
                                          ctx->blend[0][0]);
    pipe->bind_depth_stencil_alpha_state(pipe, dsa_stage);
    if (cbsurf)
-      bind_fs_clear_color(ctx, false);
+      bind_fs_clear_color(ctx, BLITTER_FS_CLEAR_COL_ONE_CBUF);
    else
       bind_fs_empty(ctx);
 
@@ -2584,7 +2599,7 @@ void util_blitter_custom_resolve_color(struct blitter_context *blitter,
    /* bind states */
    pipe->bind_blend_state(pipe, custom_blend);
    pipe->bind_depth_stencil_alpha_state(pipe, ctx->dsa_keep_depth_stencil);
-   bind_fs_clear_color(ctx, false);
+   bind_fs_clear_color(ctx, BLITTER_FS_CLEAR_COL_ONE_CBUF);
    pipe->set_sample_mask(pipe, sample_mask);
    if (pipe->set_min_samples)
       pipe->set_min_samples(pipe, 1);
@@ -2645,7 +2660,7 @@ void util_blitter_custom_color(struct blitter_context *blitter,
    pipe->bind_blend_state(pipe, custom_blend ? custom_blend
                                              : ctx->blend[PIPE_MASK_RGBA][0]);
    pipe->bind_depth_stencil_alpha_state(pipe, ctx->dsa_keep_depth_stencil);
-   bind_fs_clear_color(ctx, false);
+   bind_fs_clear_color(ctx, BLITTER_FS_CLEAR_COL_ONE_CBUF);
 
    /* set a framebuffer state */
    pipe_surface_size(dstsurf, &fb_state.width, &fb_state.height);

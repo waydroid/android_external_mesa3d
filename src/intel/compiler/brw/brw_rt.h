@@ -277,7 +277,20 @@ brw_rt_ray_queries_stack_ids_per_dss(const struct intel_device_info *devinfo)
     *    "For Sync Ray tracing (i.e. using RayQueries), SW must allocate
     *    space assuming 2K StackIDs"
     */
-   return 2048;
+   uint32_t num_stack_id_per_dss = 2048;
+
+   /* Wa_14021821874, Wa_14018813551, Wa_14026600921:
+    *
+    * "StackIDControlOverride_RTGlobals = 0 (i.e. 2k)". We
+    * already set stack size per ray to 64 in brw_nir_lower_rt_intrinsics
+    * as the workaround also requires.
+    */
+   if (intel_needs_workaround(devinfo, 14021821874) ||
+       intel_needs_workaround(devinfo, 14018813551) ||
+       intel_needs_workaround(devinfo, 14026600921))
+      num_stack_id_per_dss = 2048;
+
+   return num_stack_id_per_dss;
 }
 
 static inline uint32_t

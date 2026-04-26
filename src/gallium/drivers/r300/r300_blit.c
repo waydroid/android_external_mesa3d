@@ -134,8 +134,21 @@ static bool r300_fast_zclear_allowed(struct r300_context *r300,
 {
     struct pipe_framebuffer_state *fb =
         (struct pipe_framebuffer_state*)r300->fb_state.state;
+    struct r300_resource *tex = r300_resource(fb->zsbuf.texture);
+    unsigned zmask_dwords = tex->tex.zmask_dwords[fb->zsbuf.level];
 
-    return r300_resource(fb->zsbuf.texture)->tex.zmask_dwords[fb->zsbuf.level] != 0;
+    if (!zmask_dwords)
+        return false;
+
+    /* On tested RV530, 3D_CLEAR_ZMASK does not work above 0x1400. Avoid fast Z
+     * clear in that range and fall back to normal depth clear.
+     *
+     * FIXME: Validate whether pre-R5xx families need a similar guard and/or
+     * a different threshold. */
+    if (r300->screen->caps.is_r500 && zmask_dwords > 0x1400)
+        return false;
+
+    return true;
 }
 
 static bool r300_hiz_clear_allowed(struct r300_context *r300)

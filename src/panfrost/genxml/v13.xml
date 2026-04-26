@@ -2498,7 +2498,6 @@
   <struct name="AFRC RGB Render Target" align="64">
     <field name="Writeback Mode" size="4" start="0:0" type="Writeback Mode" default="AFRC RGB"/>
     <field name="Internal Buffer Offset" size="12" start="0:4" type="uint" modifier="shr(4)"/>
-    <field name="YUV Enable" size="1" start="0:24" type="bool" default="true"/>
     <field name="Dithered Clear" size="1" start="0:25" type="bool"/>
     <field name="Internal Format" size="6" start="0:26" type="Color Buffer Internal Format"/>
     <field name="Writeback Format" size="8" start="1:0" type="Color Format"/>
@@ -2517,7 +2516,6 @@
   <struct name="AFRC YUV Render Target" align="64">
     <field name="Writeback Mode" size="4" start="0:0" type="Writeback Mode" default="AFRC YUV"/>
     <field name="Internal Buffer Offset" size="12" start="0:4" type="uint" modifier="shr(4)"/>
-    <field name="YUV Enable" size="1" start="0:24" type="bool" default="true"/>
     <field name="Dithered Clear" size="1" start="0:25" type="bool"/>
     <field name="Internal Format" size="6" start="0:26" type="Color Buffer Internal Format"/>
     <field name="Writeback Format" size="8" start="1:0" type="Color Format"/>

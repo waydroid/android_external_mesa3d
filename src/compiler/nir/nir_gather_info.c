@@ -1067,6 +1067,8 @@ nir_shader_gather_info(nir_shader *shader, nir_function_impl *entrypoint)
    shader->info.patch_outputs_written_indirectly = 0;
    shader->info.per_primitive_inputs = 0;
    shader->info.per_primitive_outputs = 0;
+   shader->info.linear_varyings = 0;
+   shader->info.perspective_varyings = 0;
 
    shader->info.uses_resource_info_query = false;
 

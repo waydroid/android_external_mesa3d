@@ -1558,12 +1558,6 @@ vn_physical_device_init_renderer_extensions(
 
    vk_free(alloc, exts);
 
-   /* VK_KHR_external_memory_fd is required for venus memory mapping */
-   if (!physical_dev->renderer_extensions.KHR_external_memory_fd) {
-      vk_free(alloc, physical_dev->extension_spec_versions);
-      return VK_ERROR_INCOMPATIBLE_DRIVER;
-   }
-
    return VK_SUCCESS;
 }
 
@@ -1683,6 +1677,10 @@ vn_physical_device_init(struct vn_physical_device *physical_dev)
    const VkAllocationCallbacks *alloc = &instance->base.vk.alloc;
    VkResult result;
 
+   result = vn_physical_device_init_renderer_extensions(physical_dev);
+   if (result != VK_SUCCESS)
+      return result;
+
    vn_physical_device_init_external_memory(physical_dev);
    vn_physical_device_init_external_fence_handles(physical_dev);
    vn_physical_device_init_external_semaphore_handles(physical_dev);
@@ -1714,6 +1712,7 @@ vn_physical_device_init(struct vn_physical_device *physical_dev)
    return VK_SUCCESS;
 
 fail:
+   vk_free(alloc, physical_dev->extension_spec_versions);
    vk_free(alloc, physical_dev->queue_family_properties);
    return result;
 }
@@ -1922,12 +1921,6 @@ filter_physical_devices(struct vn_physical_device *physical_devs,
       /* init renderer version and discard unsupported devices */
       VkResult result =
          vn_physical_device_init_renderer_version(physical_dev);
-      if (result != VK_SUCCESS) {
-         vn_physical_device_base_fini(&physical_dev->base);
-         continue;
-      }
-
-      result = vn_physical_device_init_renderer_extensions(physical_dev);
       if (result != VK_SUCCESS) {
          vn_physical_device_base_fini(&physical_dev->base);
          continue;

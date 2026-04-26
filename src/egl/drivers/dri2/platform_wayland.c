@@ -2312,6 +2312,10 @@ registry_handle_global_drm(void *data, struct wl_registry *registry,
          wl_registry_bind(registry, name, &wp_presentation_interface, 1);
       wp_presentation_add_listener(dri2_dpy->wp_presentation,
                                    &presentation_listener, dri2_dpy);
+#ifdef WL_FIXES_INTERFACE
+   } else if (strcmp(interface, wl_fixes_interface.name) == 0) {
+      dri2_dpy->wl_fixes = wl_registry_bind(registry, name, &wl_fixes_interface, 1);
+#endif
    }
 }
 
@@ -3150,6 +3154,10 @@ registry_handle_global_swrast(void *data, struct wl_registry *registry,
          wl_registry_bind(registry, name, &wp_presentation_interface, 1);
       wp_presentation_add_listener(dri2_dpy->wp_presentation,
                                    &presentation_listener, dri2_dpy);
+#ifdef WL_FIXES_INTERFACE
+   } else if (strcmp(interface, wl_fixes_interface.name) == 0) {
+      dri2_dpy->wl_fixes = wl_registry_bind(registry, name, &wl_fixes_interface, 1);
+#endif
    }
 
 }
@@ -3294,8 +3302,17 @@ dri2_teardown_wayland(struct dri2_egl_display *dri2_dpy)
       zwp_linux_dmabuf_v1_destroy(dri2_dpy->wl_dmabuf);
    if (dri2_dpy->wl_shm)
       wl_shm_destroy(dri2_dpy->wl_shm);
-   if (dri2_dpy->wl_registry)
+   if (dri2_dpy->wl_registry) {
+#ifdef WL_FIXES_INTERFACE
+      if (dri2_dpy->wl_fixes)
+         wl_fixes_destroy_registry(dri2_dpy->wl_fixes, dri2_dpy->wl_registry);
+#endif
       wl_registry_destroy(dri2_dpy->wl_registry);
+   }
+#ifdef WL_FIXES_INTERFACE
+   if (dri2_dpy->wl_fixes)
+      wl_fixes_destroy(dri2_dpy->wl_fixes);
+#endif
    if (dri2_dpy->wl_dpy_wrapper)
       wl_proxy_wrapper_destroy(dri2_dpy->wl_dpy_wrapper);
    if (dri2_dpy->wl_queue)

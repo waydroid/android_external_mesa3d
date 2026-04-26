@@ -220,7 +220,8 @@ panfrost_shader_compile(struct panfrost_screen *screen, const nir_shader *ir,
 
    /* Report stats only if we really got the shader compiled */
    if (out->binary.size > 0) {
-      if (s->info.stage == MESA_SHADER_VERTEX && out->info.vs.idvs) {
+      if (s->info.stage == MESA_SHADER_VERTEX &&
+          out->info.vs.secondary_offset) {
          pan_stats_util_debug(dbg, "MESA_SHADER_POSITION",
                               &out->info.stats);
          pan_stats_util_debug(dbg, "MESA_SHADER_VERTEX",

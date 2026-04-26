@@ -9780,6 +9780,9 @@ radv_CmdExecuteCommands(VkCommandBuffer commandBuffer, uint32_t commandBufferCou
       primary->state.emitted_compute_pipeline = secondary->state.emitted_compute_pipeline;
       primary->state.emitted_rt_pipeline = secondary->state.emitted_rt_pipeline;
 
+      primary->state.ps_epilog = secondary->state.ps_epilog;
+      primary->state.emitted_vs_prolog = secondary->state.emitted_vs_prolog;
+
       if (secondary->state.last_ia_multi_vgt_param) {
          primary->state.last_ia_multi_vgt_param = secondary->state.last_ia_multi_vgt_param;
       }
@@ -10382,13 +10385,17 @@ radv_cs_emit_compute_predication(const struct radv_device *device, struct radv_c
 }
 
 ALWAYS_INLINE static void
-radv_gfx12_emit_hiz_wa(const struct radv_device *device, const struct radv_cmd_state *cmd_state,
-                       struct radv_cmd_stream *cs)
+radv_gfx12_emit_wa(const struct radv_device *device, const struct radv_cmd_state *cmd_state, struct radv_cmd_stream *cs)
 {
    const struct radv_physical_device *pdev = radv_device_physical(device);
    const struct radv_rendering_state *render = &cmd_state->render;
+   const bool hiz_partial_wa_enabled = pdev->gfx12_hiz_wa == RADV_GFX12_HIZ_WA_PARTIAL && render->gfx12_has_hiz;
+   const bool vrs_export_wa_enabled = pdev->info.has_vrs_export_bug && cmd_state->last_vgt_shader &&
+                                      cmd_state->last_vgt_shader->info.outinfo.writes_primitive_shading_rate;
 
-   if (pdev->gfx12_hiz_wa == RADV_GFX12_HIZ_WA_PARTIAL && render->gfx12_has_hiz) {
+   /* Emit BOP events to mitigate some hardware bugs on GFX12. */
+   if (hiz_partial_wa_enabled || vrs_export_wa_enabled) {
+      assert(pdev->info.gfx_level == GFX12);
       radeon_begin(cs);
       radeon_emit(PKT3(PKT3_RELEASE_MEM, 6, 0));
       radeon_emit(S_490_EVENT_TYPE(V_028A90_BOTTOM_OF_PIPE_TS) | S_490_EVENT_INDEX(5));
@@ -10414,7 +10421,7 @@ radv_cs_emit_draw_packet(struct radv_cmd_buffer *cmd_buffer, uint32_t vertex_cou
    radeon_emit(V_0287F0_DI_SRC_SEL_AUTO_INDEX | use_opaque);
    radeon_end();
 
-   radv_gfx12_emit_hiz_wa(device, &cmd_buffer->state, cs);
+   radv_gfx12_emit_wa(device, &cmd_buffer->state, cs);
 }
 
 /**
@@ -10444,7 +10451,7 @@ radv_cs_emit_draw_indexed_packet(struct radv_cmd_buffer *cmd_buffer, uint64_t in
    radeon_emit(V_0287F0_DI_SRC_SEL_DMA | S_0287F0_NOT_EOP(not_eop));
    radeon_end();
 
-   radv_gfx12_emit_hiz_wa(device, &cmd_buffer->state, cs);
+   radv_gfx12_emit_wa(device, &cmd_buffer->state, cs);
 }
 
 /* MUST inline this function to avoid massive perf loss in drawoverhead */
@@ -10496,7 +10503,7 @@ radv_cs_emit_indirect_draw_packet(struct radv_cmd_buffer *cmd_buffer, bool index
 
    radeon_end();
 
-   radv_gfx12_emit_hiz_wa(device, &cmd_buffer->state, cs);
+   radv_gfx12_emit_wa(device, &cmd_buffer->state, cs);
 
    cmd_buffer->state.uses_draw_indirect = true;
 }
@@ -10542,7 +10549,7 @@ radv_cs_emit_indirect_mesh_draw_packet(struct radv_cmd_buffer *cmd_buffer, uint3
    radeon_emit(V_0287F0_DI_SRC_SEL_AUTO_INDEX);
    radeon_end();
 
-   radv_gfx12_emit_hiz_wa(device, &cmd_buffer->state, cs);
+   radv_gfx12_emit_wa(device, &cmd_buffer->state, cs);
 }
 
 ALWAYS_INLINE static void
@@ -10626,7 +10633,7 @@ radv_cs_emit_dispatch_taskmesh_gfx_packet(const struct radv_device *device, cons
    radeon_emit(V_0287F0_DI_SRC_SEL_AUTO_INDEX);
    radeon_end();
 
-   radv_gfx12_emit_hiz_wa(device, cmd_state, cs);
+   radv_gfx12_emit_wa(device, cmd_state, cs);
 }
 
 ALWAYS_INLINE static void
@@ -10930,7 +10937,7 @@ radv_cs_emit_mesh_dispatch_packet(struct radv_cmd_buffer *cmd_buffer, uint32_t x
    radeon_emit(S_0287F0_SOURCE_SELECT(V_0287F0_DI_SRC_SEL_AUTO_INDEX));
    radeon_end();
 
-   radv_gfx12_emit_hiz_wa(device, &cmd_buffer->state, cs);
+   radv_gfx12_emit_wa(device, &cmd_buffer->state, cs);
 }
 
 ALWAYS_INLINE static void
@@ -15167,10 +15174,19 @@ radv_CmdBeginTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32_t firstC
 
    assert(firstCounterBuffer + counterBufferCount <= MAX_SO_BUFFERS);
 
-   if (pdev->info.gfx_level >= GFX12)
+   if (pdev->info.gfx_level >= GFX12) {
       radv_init_streamout_state(cmd_buffer);
-   else if (!pdev->use_ngg_streamout)
+
+      /* Invalidate L2 in case the buffer filled size needs to be saved because COPY_DATA isn't
+       * coherent with L2.
+       */
+      if (pdev->info.cp_sdma_ge_use_system_memory_scope) {
+         cmd_buffer->state.flush_bits |= RADV_CMD_FLAG_INV_L2;
+         radv_emit_cache_flush(cmd_buffer);
+      }
+   } else if (!pdev->use_ngg_streamout) {
       radv_flush_vgt_streamout(cmd_buffer);
+   }
 
    ASSERTED unsigned cdw_max = radeon_check_space(device->ws, cs->b, MAX_SO_BUFFERS * 10);
 

@@ -545,9 +545,9 @@ anv_is_dual_src_blend_factor(VkBlendFactor factor)
 static inline bool
 anv_is_dual_src_blend_equation(const struct vk_color_blend_attachment_state *cb)
 {
-   return anv_is_dual_src_blend_factor(cb->src_color_blend_factor) &&
-          anv_is_dual_src_blend_factor(cb->dst_color_blend_factor) &&
-          anv_is_dual_src_blend_factor(cb->src_alpha_blend_factor) &&
+   return anv_is_dual_src_blend_factor(cb->src_color_blend_factor) ||
+          anv_is_dual_src_blend_factor(cb->dst_color_blend_factor) ||
+          anv_is_dual_src_blend_factor(cb->src_alpha_blend_factor) ||
           anv_is_dual_src_blend_factor(cb->dst_alpha_blend_factor);
 }
 

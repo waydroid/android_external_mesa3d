@@ -545,7 +545,6 @@ st_context_add_work(struct st_context *st)
     * performance.
     */
    if (unlikely(++st->work_counter % 512 == 0)) {
-      st->work_counter = 0;
       if (!st->thread_scheduler_disabled)
          st_context_apply_scheduler_policy(st);
    }

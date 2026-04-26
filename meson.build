@@ -1958,6 +1958,9 @@ if with_clc
     if dep_llvm.version().version_compare('>= 18.0')
       clang_modules += 'clangAPINotes'
     endif
+    if dep_llvm.version().version_compare('>= 22.0')
+      clang_modules += ['clangAnalysisLifetimeSafety', 'clangOptions']
+    endif
 
     dep_clang = []
     foreach m : clang_modules
