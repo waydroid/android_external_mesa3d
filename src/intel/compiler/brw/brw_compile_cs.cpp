@@ -249,7 +249,8 @@ brw_compile_cs(const struct brw_compiler *compiler,
       g.enable_debug(name);
    }
 
-   uint32_t max_dispatch_width = 8u << (util_last_bit(prog_data->prog_mask) - 1);
+   const uint32_t max_dispatch_width =
+      8u << (util_last_bit(prog_data->prog_mask) - 1);
 
    struct genisa_stats *stats = params->base.stats;
    for (unsigned simd = 0; simd < 3; simd++) {
@@ -262,8 +263,6 @@ brw_compile_cs(const struct brw_compiler *compiler,
 
          prog_data->base.grf_used = MAX2(prog_data->base.grf_used,
                                          v[simd]->grf_used);
-
-         max_dispatch_width = 8u << simd;
       }
    }
 

@@ -553,6 +553,8 @@ vlVaHandleVAProcPipelineParameterBufferType(vlVaDriver *drv, vlVaContext *contex
          return VA_STATUS_ERROR_INVALID_PARAMETER;
 
       dst_surface = handle_table_get(drv->htab, param->additional_outputs[0]);
+      if (!dst_surface)
+         return VA_STATUS_ERROR_INVALID_SURFACE;
    }
 
    src_region = vlVaRegionDefault(param->surface_region, src_surface, &def_src_region);
@@ -704,7 +706,7 @@ vlVaHandleVAProcPipelineParameterBufferType(vlVaDriver *drv, vlVaContext *contex
       vpp.out_transfer_characteristics = param->output_color_properties.transfer_characteristics;
       vpp.out_matrix_coefficients = param->output_color_properties.matrix_coefficients;
    } else {
-      vlVaGetColorProperties(param->surface_color_standard, &vpp.out_color_primaries,
+      vlVaGetColorProperties(param->output_color_standard, &vpp.out_color_primaries,
                              &vpp.out_transfer_characteristics, &vpp.out_matrix_coefficients);
    }
 

@@ -771,6 +771,7 @@ radv_shader_spirv_to_nir(struct radv_device *device, const struct radv_shader_st
       radv_optimize_nir(nir, false);
 
       NIR_PASS(_, nir, nir_opt_memcpy);
+      NIR_PASS(_, nir, nir_opt_deref);
    }
 
    /* We call nir_lower_var_copies() after the first radv_optimize_nir()

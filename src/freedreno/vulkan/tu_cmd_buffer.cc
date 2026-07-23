@@ -214,6 +214,7 @@ tu6_lazy_init_vsc(struct tu_cmd_buffer *cmd)
    cmd->vsc_draw_strm_offset = prim_strm_size;
    cmd->vsc_draw_strm_size_offset = cmd->vsc_draw_strm_offset + draw_strm_size;
    cmd->vsc_state_offset = cmd->vsc_draw_strm_size_offset + draw_strm_size_size;
+   cmd->vsc_initialized = true;
 }
 
 static void
@@ -251,8 +252,6 @@ tu_emit_vsc(struct tu_cmd_buffer *cmd, struct tu_cs *cs)
       tu_cs_emit(cs, A6XX_CP_SET_PSEUDO_REG__0_PSEUDO_REG(VSC_PIPE_DATA_PRIM_BASE));
       tu_emit_vis_stream_patchpoint(cmd, cs, cmd->vsc_prim_strm_offset);
    }
-
-   cmd->vsc_initialized = true;
 }
 
 struct tu_set_render_mode {
@@ -350,8 +349,13 @@ tu6_emit_flushes(struct tu_cmd_buffer *cmd_buffer,
       tu_emit_event_write<CHIP>(cmd_buffer, cs, FD_CCU_CLEAN_BLIT_CACHE);
    if (CHIP >= A7XX && (flushes & TU_CMD_FLAG_CCHE_INVALIDATE) &&
        /* Invalidating UCHE seems to also invalidate CCHE */
-       !(flushes & TU_CMD_FLAG_CACHE_INVALIDATE))
+       !(flushes & TU_CMD_FLAG_CACHE_INVALIDATE)) {
+      /* CP_CCHE_INVALIDATE is just a plain register write underneath, so
+       * it needs WFI before it, in order to invalidate at the right point.
+       */
+      tu_cs_emit_wfi(cs);
       tu_cs_emit_pkt7(cs, CP_CCHE_INVALIDATE, 0);
+   }
    if (CHIP == A7XX && (flushes & TU_CMD_FLAG_RTU_INVALIDATE) &&
        cmd_buffer->device->physical_device->info->props.has_rt_workaround)
       tu_emit_rt_workaround<CHIP>(cmd_buffer, cs);
@@ -3395,11 +3399,11 @@ tu6_tile_render_begin(struct tu_cmd_buffer *cmd, struct tu_cs *cs,
       tu_cs_emit_regs(cs, RB_BIN_FOVEAT(CHIP));
    }
 
-   if (use_binning) {
-      if (!cmd->vsc_initialized) {
-         tu6_lazy_init_vsc(cmd);
-      }
+   if (!cmd->vsc_initialized) {
+      tu6_lazy_init_vsc(cmd);
+   }
 
+   if (use_binning) {
       /* We always emit VSC before each renderpass, because due to
        * skipsaverestore the underlying VSC registers may have become
        * invalid. Normally we'd need to WFI before setting these non-context
@@ -3460,13 +3464,6 @@ tu6_tile_render_begin(struct tu_cmd_buffer *cmd, struct tu_cs *cs,
    }
 
    if (vsc->binning_possible) {
-      /* On a7xx we always need VSC allocated because the VSC state has to go
-       * together with other stream data. We could allocate just the VSC state
-       * if binning is disabled but it doesn't seem worth it.
-       */
-      if (CHIP >= A7XX && !cmd->vsc_initialized)
-         tu6_lazy_init_vsc(cmd);
-
       /* Upload state regs to memory to be restored on skipsaverestore
        * preemption. On a7xx this is considered part of the vis stream that
        * requires a patchpoint.

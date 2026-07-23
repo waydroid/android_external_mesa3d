@@ -103,6 +103,7 @@ shade_quads(struct lp_rasterizer_task *task,
    assert(!variant->key.depth.enabled);
 
    /* Propagate non-interpolated raster state */
+   task->thread_data.raster_state.view_index = inputs->view_index;
    task->thread_data.raster_state.viewport_index = inputs->viewport_index;
 
    /* run shader on 4x4 block */

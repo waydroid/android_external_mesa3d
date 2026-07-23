@@ -1067,8 +1067,6 @@ nir_shader_gather_info(nir_shader *shader, nir_function_impl *entrypoint)
    shader->info.patch_outputs_written_indirectly = 0;
    shader->info.per_primitive_inputs = 0;
    shader->info.per_primitive_outputs = 0;
-   shader->info.linear_varyings = 0;
-   shader->info.perspective_varyings = 0;
 
    shader->info.uses_resource_info_query = false;
 
@@ -1086,6 +1084,8 @@ nir_shader_gather_info(nir_shader *shader, nir_function_impl *entrypoint)
 
       /* By definition the fragment shader knows, unless we fail to gather. */
       shader->info.known_interpolation_qualifiers = true;
+      shader->info.linear_varyings = 0;
+      shader->info.perspective_varyings = 0;
    }
    if (shader->info.stage == MESA_SHADER_TESS_CTRL) {
       shader->info.tess.tcs_same_invocation_inputs_read = 0;

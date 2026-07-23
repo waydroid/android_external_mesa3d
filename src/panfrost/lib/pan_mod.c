@@ -179,8 +179,8 @@ pan_mod_afbc_init_slice_layout(
    slayout->afbc.surface_stride_B = surf_stride_B;
    slayout->size_B = surf_stride_B * mip_extent_px.depth;
 
-   if (hdr_surf_size_B > UINT32_MAX || surf_stride_B > UINT32_MAX ||
-       slayout->size_B > UINT32_MAX)
+   if (hdr_surf_size_B > UINT32_MAX || surf_stride_B > MAX_SLICE_STRIDE_B ||
+       slayout->size_B > MAX_SIZE_B)
       return false;
 
    return true;
@@ -682,7 +682,7 @@ pan_mod_linear_init_slice_layout(
 
    /* Surface stride is passed as a 32-bit unsigned integer to RT/ZS and texture
     * descriptors, make sure it fits. */
-   if (surf_stride_B > UINT32_MAX)
+   if (surf_stride_B > MAX_SLICE_STRIDE_B)
       return false;
 
    slayout->tiled_or_linear.surface_stride_B = surf_stride_B;

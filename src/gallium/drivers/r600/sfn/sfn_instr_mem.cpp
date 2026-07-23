@@ -91,12 +91,13 @@ GDSInstr::emit_atomic_counter(nir_intrinsic_instr *intr, Shader& shader)
    case nir_intrinsic_atomic_counter_comp_swap:
       return emit_atomic_counter_comp_swap(intr, shader);
    case nir_intrinsic_atomic_counter_read:
-   case nir_intrinsic_atomic_counter_post_dec:
       return emit_atomic_read(intr, shader);
    case nir_intrinsic_atomic_counter_inc:
       return emit_atomic_inc(intr, shader);
    case nir_intrinsic_atomic_counter_pre_dec:
       return emit_atomic_pre_dec(intr, shader);
+   case nir_intrinsic_atomic_counter_post_dec:
+      return emit_atomic_post_dec(intr, shader);
    default:
       return false;
    }
@@ -350,6 +351,48 @@ GDSInstr::emit_atomic_pre_dec(nir_intrinsic_instr *instr, Shader& shader)
                                            tmp_dest,
                                            vf.one_i(),
                                            AluInstr::write));
+   return true;
+}
+
+bool
+GDSInstr::emit_atomic_post_dec(nir_intrinsic_instr *instr, Shader& shader)
+{
+   auto& vf = shader.value_factory();
+
+   bool read_result = !list_is_empty(&instr->def.uses);
+
+   auto opcode = read_result ? DS_OP_SUB_RET : DS_OP_SUB;
+
+   auto [offset, uav_id] = shader.evaluate_resource_offset(instr, 0);
+
+   offset += shader.remap_atomic_base(nir_intrinsic_base(instr));
+
+   auto *dest = read_result ? vf.dest(instr->def, 0, pin_free) : nullptr;
+
+   GDSInstr *ir = nullptr;
+
+   if (shader.chip_class() < ISA_CC_CAYMAN) {
+      RegisterVec4 src(nullptr, shader.atomic_update(), nullptr, nullptr, pin_chan);
+      ir = new GDSInstr(opcode, dest, src, offset, uav_id);
+   } else {
+      auto tmp = vf.temp_vec4(pin_group, {0, 1, 7, 7});
+      if (uav_id)
+         shader.emit_instruction(new AluInstr(op3_muladd_uint24,
+                                              tmp[0],
+                                              uav_id,
+                                              vf.literal(4),
+                                              vf.literal(4 * offset),
+                                              AluInstr::write));
+      else
+         shader.emit_instruction(
+            new AluInstr(op1_mov, tmp[0], vf.literal(4 * offset), AluInstr::write));
+
+      shader.emit_instruction(
+         new AluInstr(op1_mov, tmp[1], shader.atomic_update(), AluInstr::write));
+      ir = new GDSInstr(opcode, dest, tmp, 0, nullptr);
+   }
+
+   shader.emit_instruction(ir);
    return true;
 }
 

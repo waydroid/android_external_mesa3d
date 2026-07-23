@@ -1160,6 +1160,42 @@ pipe_surface_templ_from_sampler_view(const struct pipe_sampler_view *state, stru
    return templ;
 }
 
+static void
+init_sampler_view(struct zink_context *ctx, struct zink_sampler_view *sv)
+{
+   struct zink_screen *screen = zink_screen(ctx->base.screen);
+   struct zink_resource *res = zink_resource(sv->base.texture);
+   struct pipe_surface templ = pipe_surface_templ_from_sampler_view(&sv->base, &res->base.b, sv->base.target);
+   sv->image_view = zink_get_surface(ctx, &templ, &sv->ivci);
+
+   bool red_depth_sampler_view = false;
+   if (sv->ivci.subresourceRange.aspectMask == VK_IMAGE_ASPECT_DEPTH_BIT ||
+       screen->driver_compiler_workarounds.needs_zs_shader_swizzle) {
+      VkComponentSwizzle *swizzle = (VkComponentSwizzle*)&sv->ivci.components;
+      for (unsigned i = 0; i < 4; i++) {
+         if (swizzle[i] == VK_COMPONENT_SWIZZLE_ONE ||
+             (swizzle[i] == VK_COMPONENT_SWIZZLE_ZERO && sv->ivci.subresourceRange.aspectMask == VK_IMAGE_ASPECT_DEPTH_BIT))
+            red_depth_sampler_view = true;
+      }
+   }
+
+   if (!screen->info.have_EXT_non_seamless_cube_map && viewtype_is_cube(&sv->ivci)) {
+      VkImageViewCreateInfo ivci = sv->ivci;
+      ivci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+      sv->cube_array = zink_get_surface(ctx, &templ, &ivci);
+   } else if (red_depth_sampler_view) {
+      VkImageViewCreateInfo ivci = sv->ivci;
+      /* there is only one component, and real swizzling can't be done here,
+         * so ensure the shader gets the sampled data
+         */
+      ivci.components.r = VK_COMPONENT_SWIZZLE_R;
+      ivci.components.g = VK_COMPONENT_SWIZZLE_R;
+      ivci.components.b = VK_COMPONENT_SWIZZLE_R;
+      ivci.components.a = VK_COMPONENT_SWIZZLE_R;
+      sv->zs_view = zink_get_surface(ctx, &templ, &ivci);
+   }
+}
+
 static struct pipe_sampler_view *
 zink_create_sampler_view(struct pipe_context *pctx, struct pipe_resource *pres,
                          const struct pipe_sampler_view *state)
@@ -1169,7 +1205,6 @@ zink_create_sampler_view(struct pipe_context *pctx, struct pipe_resource *pres,
    struct zink_context *ctx = zink_context(pctx);
    struct zink_sampler_view *sampler_view = CALLOC_STRUCT_CL(zink_sampler_view);
    enum pipe_texture_target target = state->is_tex2d_from_buf ? PIPE_TEXTURE_2D : state->target;
-   bool err;
 
    if (!sampler_view) {
       mesa_loge("ZINK: failed to allocate sampler_view!");
@@ -1205,7 +1240,6 @@ zink_create_sampler_view(struct pipe_context *pctx, struct pipe_resource *pres,
       ivci = create_ivci(screen, res, &templ, target);
       ivci.subresourceRange.levelCount = state->is_tex2d_from_buf ? 1 : (state->u.tex.last_level - state->u.tex.first_level + 1);
       ivci.subresourceRange.aspectMask = util_format_is_depth_or_stencil(state->format) ? sampler_aspect_from_format(state->format) : res->aspect;
-      bool red_depth_sampler_view = false;
       /* samplers for stencil aspects of packed formats need to always use stencil swizzle */
       if (ivci.subresourceRange.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) {
          ivci.components.r = zink_component_mapping(clamp_zs_swizzle(sampler_view->base.swizzle_r));
@@ -1222,12 +1256,6 @@ zink_create_sampler_view(struct pipe_context *pctx, struct pipe_resource *pres,
           */
          if (ivci.subresourceRange.aspectMask == VK_IMAGE_ASPECT_DEPTH_BIT ||
              zink_screen(ctx->base.screen)->driver_compiler_workarounds.needs_zs_shader_swizzle) {
-            VkComponentSwizzle *swizzle = (VkComponentSwizzle*)&ivci.components;
-            for (unsigned i = 0; i < 4; i++) {
-               if (swizzle[i] == VK_COMPONENT_SWIZZLE_ONE ||
-                   (swizzle[i] == VK_COMPONENT_SWIZZLE_ZERO && ivci.subresourceRange.aspectMask == VK_IMAGE_ASPECT_DEPTH_BIT))
-                  red_depth_sampler_view = true;
-            }
             /* this is the data that will be used in shader rewrites */
             sampler_view->swizzle.s[0] = clamp_zs_swizzle(sampler_view->base.swizzle_r);
             sampler_view->swizzle.s[1] = clamp_zs_swizzle(sampler_view->base.swizzle_g);
@@ -1290,21 +1318,6 @@ zink_create_sampler_view(struct pipe_context *pctx, struct pipe_resource *pres,
       assert(ivci.format);
 
       sampler_view->ivci = ivci;
-      sampler_view->image_view = zink_get_surface(ctx, &templ, &ivci);
-      if (!screen->info.have_EXT_non_seamless_cube_map && viewtype_is_cube(&ivci)) {
-         ivci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-         sampler_view->cube_array = zink_get_surface(ctx, &templ, &ivci);
-      } else if (red_depth_sampler_view) {
-         /* there is only one component, and real swizzling can't be done here,
-          * so ensure the shader gets the sampled data
-          */
-         ivci.components.r = VK_COMPONENT_SWIZZLE_R;
-         ivci.components.g = VK_COMPONENT_SWIZZLE_R;
-         ivci.components.b = VK_COMPONENT_SWIZZLE_R;
-         ivci.components.a = VK_COMPONENT_SWIZZLE_R;
-         sampler_view->zs_view = zink_get_surface(ctx, &templ, &ivci);
-      }
-      err = !sampler_view->image_view;
    } else {
       if (zink_descriptor_mode == ZINK_DESCRIPTOR_MODE_DB) {
          /* always enforce limit clamping */
@@ -1313,12 +1326,6 @@ zink_create_sampler_view(struct pipe_context *pctx, struct pipe_resource *pres,
          return &sampler_view->base;
       }
       sampler_view->rebind_count = res->rebind_count;
-      sampler_view->buffer_view = get_buffer_view(ctx, res, state->format, state->u.buf.offset, state->u.buf.size);
-      err = !sampler_view->buffer_view;
-   }
-   if (err) {
-      FREE_CL(sampler_view);
-      return NULL;
    }
    return &sampler_view->base;
 }
@@ -1434,7 +1441,7 @@ zink_bind_vertex_elements_state(struct pipe_context *pctx,
 {
    struct zink_context *ctx = zink_context(pctx);
    struct zink_gfx_pipeline_state *state = &ctx->gfx_pipeline_state;
-   unsigned old_num_bindings = state->element_state ? state->element_state->num_bindings : 0;
+   unsigned old_num_bindings = state->element_state ? state->element_state->num_bindings : ctx->vertex_buffers_count;
    ctx->element_state = cso;
    /* existing vbos will be replaced on next set_vb call */
    for (unsigned i = ctx->element_state ? ctx->element_state->hw_state.num_bindings : 0; i < old_num_bindings; i++) {
@@ -1544,6 +1551,7 @@ zink_set_vertex_buffers_internal(struct pipe_context *pctx,
          assert(ctx->vertex_buffers[b].buffer.resource);
 #endif
    }
+   ctx->vertex_buffers_count = num_buffers;
    ctx->vertex_buffers_dirty = num_buffers > 0;
 }
 
@@ -2379,7 +2387,7 @@ zink_set_sampler_views(struct pipe_context *pctx,
                   if (!a || a->base.texture != b->base.texture || zink_resource(a->base.texture)->obj != res->obj ||
                      memcmp(&a->base.u.buf, &b->base.u.buf, sizeof(b->base.u.buf)))
                      update = true;
-               } else if (b->rebind_count != res->rebind_count) {
+               } else if (b->rebind_count != res->rebind_count || !b->buffer_view) {
                   /* if this resource has been rebound while it wasn't set here,
                   * its backing resource will have changed and thus we need to update
                   * the bufferview
@@ -2395,10 +2403,9 @@ zink_set_sampler_views(struct pipe_context *pctx,
                if (!ctx->unordered_blitting)
                   res->obj->unordered_read = false;
             } else {
-               if (res->rebind_count != b->rebind_count) {
+               if (res->rebind_count != b->rebind_count || !b->image_view) {
                   b->rebind_count = res->rebind_count;
-                  struct pipe_surface tmpl = pipe_surface_templ_from_sampler_view(&b->base, &res->base.b, b->base.target);
-                  b->image_view = zink_get_surface(ctx, &tmpl, &b->ivci);
+                  init_sampler_view(ctx, b);
                   update = true;
                } else  if (a != b)
                   update = true;
@@ -2488,6 +2495,8 @@ zink_create_texture_handle(struct pipe_context *pctx, struct pipe_sampler_view *
       bd->ds.db.offset = view->u.buf.offset;
       bd->ds.db.size = view->u.buf.size;
    } else {
+      if (!sv->image_view)
+         init_sampler_view(ctx, sv);
       bd->ds.surface = sv->image_view;
       bd->first_layer = view->u.tex.first_layer;
       bd->last_layer = view->u.tex.last_layer;

@@ -4692,7 +4692,7 @@ bi_emit_tex_valhall(bi_builder *b, nir_tex_instr *instr)
          bi_instr *I = bi_tex_gradient_to(b, grdesc, idx, src0, src1, dim,
                                           !narrow_indices, 1, sr_count);
          I->derivative_enable = false;
-         I->force_delta_enable = true;
+         I->force_delta_enable = false;
          I->lod_clamp_disable = i != 0;
          I->register_format = BI_REGISTER_FORMAT_U32;
          bi_index lod;

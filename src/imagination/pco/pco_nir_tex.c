@@ -407,19 +407,13 @@ nir_intrinsic_instr *pco_emit_nir_smp(nir_builder *b, pco_smp_params *params)
 static nir_def *
 lower_tex_gather(nir_builder *b, nir_tex_instr *tex, nir_def *raw_data)
 {
-   unsigned swiz[ARRAY_SIZE(tex->tg4_offsets)];
-   for (unsigned u = 0; u < ARRAY_SIZE(tex->tg4_offsets); ++u) {
-      unsigned offset = ARRAY_SIZE(*tex->tg4_offsets) * tex->tg4_offsets[u][0];
-      offset += tex->tg4_offsets[u][1];
-      offset *= ARRAY_SIZE(tex->tg4_offsets);
-      offset += tex->component;
+   assert(!nir_tex_instr_has_explicit_tg4_offsets(tex));
 
-      swiz[u] = offset;
-   }
+#define TG4_SEL(sample) (((sample) * 4) + tex->component)
+   unsigned swiz[] = { TG4_SEL(2), TG4_SEL(3), TG4_SEL(1), TG4_SEL(0) };
+#undef TG4_SEL
 
-   nir_def *result = nir_swizzle(b, raw_data, swiz, ARRAY_SIZE(swiz));
-
-   return result;
+   return nir_swizzle(b, raw_data, swiz, ARRAY_SIZE(swiz));
 }
 
 static nir_def *lower_tex_shadow(nir_builder *b,
@@ -647,7 +641,7 @@ static nir_def *lower_tex(nir_builder *b, nir_instr *instr, void *cb_data)
          assert(array_index);
 
          nir_def *array_max = usclib_tex_state_array_max(b, tex_state);
-         array_index = nir_uclamp(b, array_index, nir_imm_int(b, 0), array_max);
+         array_index = nir_iclamp(b, array_index, nir_imm_int(b, 0), array_max);
          if (is_cube_array)
             array_index = nir_imul_imm(b, array_index, 6);
 
@@ -1250,7 +1244,7 @@ static nir_def *lower_image(nir_builder *b, nir_instr *instr, void *cb_data)
       if (is_array) {
          assert(array_index);
          nir_def *array_max = usclib_tex_state_array_max(b, tex_state);
-         array_index = nir_uclamp(b, array_index, nir_imm_int(b, 0), array_max);
+         array_index = nir_iclamp(b, array_index, nir_imm_int(b, 0), array_max);
 
          nir_def *tex_meta = nir_load_tex_meta_pco(b,
                                                    PCO_IMAGE_META_COUNT,
@@ -1421,7 +1415,7 @@ static nir_def *lower_image(nir_builder *b, nir_instr *instr, void *cb_data)
          assert(array_index);
 
          nir_def *array_max = usclib_tex_state_array_max(b, tex_state);
-         array_index = nir_uclamp(b, array_index, nir_imm_int(b, 0), array_max);
+         array_index = nir_iclamp(b, array_index, nir_imm_int(b, 0), array_max);
 
          nir_def *tex_meta = nir_load_tex_meta_pco(b,
                                                    PCO_IMAGE_META_COUNT,

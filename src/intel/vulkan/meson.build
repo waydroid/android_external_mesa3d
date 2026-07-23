@@ -257,9 +257,6 @@ libanv_common = static_library(
   dependencies : anv_deps
 )
 
-idep_libvulkan_intel_decoder = (with_mesa_ndebug ?
-  idep_intel_decoder_stub_brw : idep_intel_decoder_brw)
-
 libvulkan_intel = shared_library(
   'vulkan_intel',
   [files('anv_gem.c'), anv_entrypoints[0], bvh_spv],
@@ -275,7 +272,7 @@ libvulkan_intel = shared_library(
     idep_nir, idep_genxml, idep_vulkan_util, idep_vulkan_wsi,
     idep_vulkan_runtime, idep_mesautil, idep_xmlconfig,
     idep_intel_driver_ds, idep_intel_dev, idep_intel_blorp,
-    idep_intel_compiler_brw, idep_libvulkan_intel_decoder
+    idep_intel_compiler_brw, idep_intel_decoder_brw,
   ],
   c_args : anv_flags,
   gnu_symbol_visibility : 'hidden',
@@ -313,7 +310,7 @@ if with_tests
       dep_thread, dep_dl, dep_m, anv_deps,
       idep_nir, idep_vulkan_util, idep_vulkan_wsi, idep_vulkan_runtime,
       idep_mesautil, idep_intel_dev, idep_intel_blorp,
-      idep_intel_compiler_brw, idep_libvulkan_intel_decoder,
+      idep_intel_compiler_brw, idep_intel_decoder_brw,
     ],
     c_args : anv_flags,
     gnu_symbol_visibility : 'hidden',

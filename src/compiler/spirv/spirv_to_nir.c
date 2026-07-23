@@ -851,6 +851,7 @@ vtn_handle_debug_printf(struct vtn_builder *b, SpvOp ext_opcode,
 
    if (argc) {
       glsl_struct_field *fields = calloc(argc, sizeof(glsl_struct_field));
+      int next_offset = 0;
       for (uint32_t i = 0; i < argc; i++) {
          struct vtn_ssa_value *arg = vtn_ssa_value(b, w[6 + i]);
 
@@ -859,8 +860,11 @@ vtn_handle_debug_printf(struct vtn_builder *b, SpvOp ext_opcode,
             fields[i].type = glsl_vector_type(fields[i].type->base_type, arg->def->num_components);
 
          fields[i].name = "";
+         fields[i].offset = next_offset;
 
-         info->arg_sizes[i] = arg->def->bit_size / 8;
+         int size = (int) arg->def->bit_size * arg->def->num_components / 8;
+         info->arg_sizes[i] = size;
+         next_offset += size;
       }
 
       nir_variable *packed_args = nir_local_variable_create(
@@ -7363,7 +7367,10 @@ spirv_to_nir(const uint32_t *words, size_t word_count,
    }
 
    const char *read_path = os_get_option_secure("MESA_SPIRV_READ_PATH");
-   if (read_path) {
+   if (!options->ignore_replacement && read_path) {
+      struct spirv_to_nir_options replace_options = *options;
+      replace_options.ignore_replacement = true;
+
       char blake3_str[BLAKE3_HEX_LEN];
       _mesa_blake3_format(blake3_str, b->shader->info.source_blake3);
 
@@ -7415,7 +7422,7 @@ spirv_to_nir(const uint32_t *words, size_t word_count,
       ralloc_free(b);
       nir_shader* result = spirv_to_nir(replacement_words, replacement_size / sizeof(uint32_t),
                                         spec, num_spec,
-                                        stage, entry_point_name, options,
+                                        stage, entry_point_name, &replace_options,
                                         nir_options);
 
       free((void *)replacement_words);

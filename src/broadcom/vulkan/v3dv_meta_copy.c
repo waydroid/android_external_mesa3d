@@ -452,6 +452,14 @@ copy_image_to_buffer_tlb(struct v3dv_cmd_buffer *cmd_buffer,
       return false;
    }
 
+   /* B10G11R11_UFLOAT_PACK32 maps to the TLB's 16F internal type, which
+    * canonicalizes NaN bit patterns when arbitrary 32 bits are
+    * reinterpreted as that format. vkCmdCopyImageToBuffer is a raw byte
+    * copy per spec, so alias the TLB format to R32_UINT.
+    */
+   if (image->vk.format == VK_FORMAT_B10G11R11_UFLOAT_PACK32)
+      fb_format = VK_FORMAT_R32_UINT;
+
    uint32_t internal_type, internal_bpp;
    v3d_X((&cmd_buffer->device->devinfo), get_internal_type_bpp_for_image_aspects)
       (fb_format, region->imageSubresource.aspectMask,
@@ -1323,6 +1331,17 @@ copy_image_tlb(struct v3dv_cmd_buffer *cmd_buffer,
    if (!dst->tiled && vk_format_is_depth_or_stencil(fb_format))
       return false;
 
+   /* B10G11R11_UFLOAT_PACK32 maps to the TLB's 16F internal type, which
+    * canonicalizes NaN bit patterns. vkCmdCopyImage is a raw byte copy
+    * per spec for any pair of texel-size compatible formats, so alias
+    * the TLB format to R32_UINT when either endpoint is B10G11R11 to
+    * preserve all 32 bits through the TLB round-trip.
+    */
+   if (src->vk.format == VK_FORMAT_B10G11R11_UFLOAT_PACK32 ||
+       dst->vk.format == VK_FORMAT_B10G11R11_UFLOAT_PACK32) {
+      fb_format = VK_FORMAT_R32_UINT;
+   }
+
    /* From the Vulkan spec, VkImageCopy valid usage:
     *
     *    "If neither the calling command’s srcImage nor the calling command’s
@@ -1535,6 +1554,14 @@ copy_image_blit(struct v3dv_cmd_buffer *cmd_buffer,
 
       dst = create_image_alias(cmd_buffer, dst,
                                dst_scale_w, dst_scale_h, format);
+   } else if (src->planes[src_plane].vk_format ==
+              VK_FORMAT_B10G11R11_UFLOAT_PACK32) {
+      /* Sampling B10G11R11_UFLOAT in the blit shader canonicalizes NaN
+       * bit patterns at the 11/11/10-bit float decode step.
+       * vkCmdCopyImage is a raw byte copy per spec, so alias to R32_UINT
+       * for this blit to keep all 32 bits intact.
+       */
+      format = VK_FORMAT_R32_UINT;
    } else {
       format = src->format->planes[src_plane].rt_type != V3D_OUTPUT_IMAGE_FORMAT_NO ?
          src->planes[src_plane].vk_format :
@@ -1851,7 +1878,7 @@ v3dv_CmdFillBuffer(VkCommandBuffer commandBuffer,
    }
 
    v3d_X((&cmd_buffer->device->devinfo), meta_fill_buffer)
-      (cmd_buffer, bo, dstOffset, size, data);
+      (cmd_buffer, bo, dst_buffer->mem_offset + dstOffset, size, data);
 
    cmd_buffer->state.is_transfer = false;
 }
@@ -2005,6 +2032,15 @@ copy_buffer_to_image_tlb(struct v3dv_cmd_buffer *cmd_buffer,
                               &fb_format)) {
       return false;
    }
+
+   /* B10G11R11_UFLOAT_PACK32 maps to the TLB's 16F internal type, which
+    * canonicalizes NaN bit patterns. vkCmdCopyBufferToImage is a raw byte
+    * copy per spec, so alias the TLB format to R32_UINT to keep all
+    * 32 bits intact (memory layout is identical, internal type becomes
+    * 32UI instead of 16F).
+    */
+   if (image->vk.format == VK_FORMAT_B10G11R11_UFLOAT_PACK32)
+      fb_format = VK_FORMAT_R32_UINT;
 
    /* From the Vulkan spec for VkBufferImageCopy2:
     *

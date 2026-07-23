@@ -298,8 +298,6 @@ lower_tex(nir_builder *b, nir_tex_instr *tex, const struct nak_compiler *nak)
 
          if (tex_h != NULL)
             PUSH(src1, tex_h);
-         if (ms_idx != NULL)
-            PUSH(src1, ms_idx);
          if (lod != NULL)
             PUSH(src1, lod);
          if (offset_mode == NAK_NIR_OFFSET_MODE_AOFFI) {
@@ -310,6 +308,8 @@ lower_tex(nir_builder *b, nir_tex_instr *tex, const struct nak_compiler *nak)
          }
          if (z_cmpr != NULL)
             PUSH(src1, z_cmpr);
+         if (ms_idx != NULL)
+            PUSH(src1, ms_idx);
       }
 
       nir_tex_instr_add_src(tex, nir_tex_src_backend1,
@@ -779,6 +779,11 @@ lower_image_txq(nir_builder *b, nir_intrinsic_instr *intrin,
           */
          nir_def *samples = build_txq_samples_raw(b, img_h, can_speculate, nak);
          nir_def *px_size_sa_log2 = build_px_size_sa_log2(b, samples);
+         /* The first two coordinates are X/Y. If we have more than that,
+          * it’s the array index and that isn’t scaled.
+          */
+         px_size_sa_log2 = nir_pad_vector_imm_int(b, px_size_sa_log2, 0,
+                                                  intrin->def.num_components);
          res = nir_ushr(b, res, px_size_sa_log2);
       }
       break;

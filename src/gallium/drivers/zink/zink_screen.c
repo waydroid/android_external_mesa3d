@@ -309,7 +309,7 @@ disk_cache_init(struct zink_screen *screen)
    const struct build_id_note *note =
        build_id_find_nhdr_for_addr(disk_cache_init);
    unsigned build_id_len = build_id_length(note);
-   assert(note && build_id_len == BUILD_ID_EXPECTED_HASH_LENGTH);
+   assert(note && build_id_len <= BUILD_ID_EXPECTED_HASH_LENGTH);
    _mesa_blake3_update(&ctx, build_id_data(note), build_id_len);
 #endif
 

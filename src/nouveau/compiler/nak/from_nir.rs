@@ -2795,7 +2795,7 @@ impl<'a> ShaderFromNir<'a> {
 
                 let comps = intrin.num_components;
                 assert!(intrin.def.bit_size() == 32);
-                assert!(comps == 5);
+                assert!(comps == 2 || comps == 3 || comps == 5);
                 let image_access =
                     ImageAccess::Formatted(ChannelMask::for_comps(comps - 1));
 

@@ -1025,7 +1025,8 @@ namespace {
                                  const dependency_list &deps,
                                  const ordered_address &jp)
    {
-      const bool exec_all = inst->force_writemask_all;
+      const bool exec_all = inst->force_writemask_all ||
+                            !needs_nomask_workaround(devinfo);
       const bool has_ordered = find_ordered_dependency(deps, jp, exec_all);
       const tgl_pipe ordered_pipe = ordered_dependency_swsb(deps, jp,
                                                             exec_all).pipe;

@@ -555,11 +555,18 @@ kgsl_is_memory_type_supported(int fd, uint32_t flags)
       return false;
    }
 
+   /* The kernel echoes back the *actual* flags it used. Some KGSL
+    * versions silently strip unsupported flags (e.g. IOCOHERENT on
+    * GPUs that lack IO-coherence) instead of failing the ioctl.
+    * Detect this by checking the requested bits are still present.
+    */
+   bool supported = (req_alloc.flags & flags) == flags;
+
    struct kgsl_gpumem_free_id req_free = { .id = req_alloc.id };
 
    safe_ioctl(fd, IOCTL_KGSL_GPUMEM_FREE_ID, &req_free);
 
-   return true;
+   return supported;
 }
 
 static bool

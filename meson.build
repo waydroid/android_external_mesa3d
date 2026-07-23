@@ -2262,7 +2262,7 @@ renderdoc_integration_supported = [
   'linux',
   'android',
 ].contains(host_machine.system())
-pre_args += '-DHAVE_RENDERDOC_INTEGRATION=@0@'.format(renderdoc_integration_supported)
+pre_args += '-DHAVE_RENDERDOC_INTEGRATION=@0@'.format(renderdoc_integration_supported.to_int())
 
 with_teflon = get_option('teflon')
 if with_teflon and with_tests

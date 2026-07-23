@@ -174,6 +174,7 @@ static void r600_bind_blend_state_internal(struct r600_context *rctx,
 	bool update_cb = false;
 
 	rctx->alpha_to_one = blend->alpha_to_one;
+	rctx->alpha_to_one_and_coverage = blend->alpha_to_one_and_coverage;
 	rctx->dual_src_blend = blend->dual_src_blend;
 
 	if (!blend_disable) {
@@ -823,6 +824,7 @@ static inline void r600_shader_selector_key(const struct pipe_context *ctx,
 		key->ps.alpha_to_one = rctx->alpha_to_one &&
 				      rctx->rasterizer && rctx->rasterizer->multisample_enable &&
 				      !rctx->cb_state.cb0_is_integer;
+		key->ps.alpha_to_one_and_coverage = key->ps.alpha_to_one && rctx->alpha_to_one_and_coverage;
 		key->ps.nr_cbufs = rctx->framebuffer.state.nr_cbufs;
                 key->ps.apply_sample_id_mask = (rctx->ps_iter_samples > 1) || !rctx->rasterizer->multisample_enable;
 		/* Dual-source blending only makes sense with nr_cbufs == 1. */

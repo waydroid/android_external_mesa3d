@@ -231,7 +231,7 @@ VertexExportForFs::emit_varying_pos(const store_loc& store_info,
                         << (4 * (store_info.location - VARYING_SLOT_CLIP_DIST0));
       m_clip_dist_write |= write_mask
                            << (4 * (store_info.location - VARYING_SLOT_CLIP_DIST0));
-      export_slot = m_cur_clip_pos++;
+      export_slot = m_cur_clip_pos++ + (m_out_point_size ? 1 : 0);
       break;
    default:
       sfn_log << SfnLog::err << __func__ << "Unsupported location " << store_info.location

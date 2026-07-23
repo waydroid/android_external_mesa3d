@@ -1125,8 +1125,7 @@ TEST_F(scoreboard_test, scalar_register_mov_immediate_is_in_scalar_pipe)
    EXPECT_PROGRESS(brw_lower_scoreboard, bld);
 
    exp.uniform().MOV(scalar, imm);
-                 SYNC_NOP(exp   )->sched = SWSB("S@1");
-   exp          .MOV(r20, scalar);
+   exp          .MOV(r20, scalar)->sched = SWSB("S@1");
 
    EXPECT_SHADERS_MATCH(bld, exp);
 }
@@ -1148,8 +1147,7 @@ TEST_F(scoreboard_test, scalar_register_mov_grf_is_not_in_scalar_pipe)
    EXPECT_PROGRESS(brw_lower_scoreboard, bld);
 
    exp.uniform().MOV     (scalar, r10);
-                 SYNC_NOP(exp       )->sched = SWSB("I@1");
-   exp          .MOV     (r20, scalar);
+   exp          .MOV     (r20, scalar)->sched = SWSB("I@1");
 
    EXPECT_SHADERS_MATCH(bld, exp);
 }

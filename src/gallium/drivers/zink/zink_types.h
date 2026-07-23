@@ -439,9 +439,9 @@ struct zink_descriptor_data {
    bool has_fbfetch;
    bool push_state_changed[ZINK_PIPELINE_MAX]; //gfx, compute, mesh
    uint8_t state_changed[ZINK_PIPELINE_MAX]; //gfx, compute, mesh
-   struct zink_descriptor_layout_key *push_layout_keys[2]; //gfx, compute
-   struct zink_descriptor_layout *push_dsl[2]; //gfx, compute
-   VkDescriptorSetLayout old_push_dsl; //the non-fbfetch layout; this can't be destroyed because it may be in use
+   struct zink_descriptor_layout_key *push_layout_keys[ZINK_PIPELINE_MAX]; //gfx, compute
+   struct zink_descriptor_layout *push_dsl[ZINK_PIPELINE_MAX]; //gfx, compute
+   VkDescriptorSetLayout old_push_dsl[ZINK_PIPELINE_MAX]; //the non-fbfetch layout (gfx,unused,mesh); this can't be destroyed because it may be in use
    VkDescriptorUpdateTemplate push_template[2]; //gfx, compute
 
    struct zink_descriptor_layout *dummy_dsl;
@@ -528,7 +528,7 @@ struct zink_batch_descriptor_data {
    unsigned pool_size[ZINK_DESCRIPTOR_BASE_TYPES];
    /* this array is sized based on the max zink_descriptor_pool_key::id used by the batch; members may be NULL */
    struct util_dynarray pools[ZINK_DESCRIPTOR_BASE_TYPES];
-   struct zink_descriptor_pool_multi push_pool[2]; //gfx, compute, mesh
+   struct zink_descriptor_pool_multi push_pool[ZINK_PIPELINE_MAX]; //gfx, compute, mesh
    /* the current program (for descriptor updating) */
    struct zink_program *pg[ZINK_PIPELINE_MAX]; //gfx, compute, mesh
    /* the current pipeline compatibility id (for pipeline compatibility rules) */
@@ -1827,6 +1827,7 @@ struct zink_context {
    struct zink_resource *needs_present;
 
    struct pipe_vertex_buffer vertex_buffers[PIPE_MAX_ATTRIBS];
+   unsigned vertex_buffers_count;
    bool vertex_buffers_dirty;
 
    struct zink_sampler_state *sampler_states[MESA_SHADER_MESH_STAGES][PIPE_MAX_SAMPLERS];

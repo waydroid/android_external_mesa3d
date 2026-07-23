@@ -301,6 +301,7 @@ struct r600_blend_state {
 	unsigned			cb_color_control_no_blend;
 	bool				dual_src_blend;
 	bool				alpha_to_one;
+	bool				alpha_to_one_and_coverage;
 };
 
 struct r600_dsa_state {
@@ -582,6 +583,7 @@ struct r600_context {
 
 	struct r600_rasterizer_state	*rasterizer;
 	bool				alpha_to_one;
+	bool				alpha_to_one_and_coverage;
 	bool				force_blend_disable;
 	bool                            gs_tri_strip_adj_fix;
 	bool				dual_src_blend;

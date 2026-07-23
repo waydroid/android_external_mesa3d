@@ -1004,13 +1004,6 @@ _mesa_initialize_context(struct gl_context *ctx,
 
    _mesa_reset_vertex_processing_mode(ctx);
 
-   /* Mesa core handles all the formats that mesa core knows about.
-    * Drivers will want to override this list with just the formats
-    * they can handle.
-    */
-   memset(&ctx->TextureFormatSupported, GL_TRUE,
-          sizeof(ctx->TextureFormatSupported));
-
    switch (ctx->API) {
    case API_OPENGL_COMPAT:
    case API_OPENGL_CORE:

@@ -362,6 +362,7 @@ static void *evergreen_create_blend_state_mode(struct pipe_context *ctx,
 	blend->dual_src_blend = util_blend_state_is_dual(state, 0);
 	blend->cb_target_mask = target_mask;
 	blend->alpha_to_one = state->alpha_to_one;
+	blend->alpha_to_one_and_coverage = state->alpha_to_one && state->alpha_to_coverage;
 
 	if (target_mask)
 		color_control |= S_028808_MODE(mode);
@@ -3837,6 +3838,10 @@ void evergreen_update_ps_state(struct pipe_context *ctx, struct r600_pipe_shader
 			break;
 		}
 	}
+
+	if (unlikely(rctx->alpha_to_one_and_coverage))
+		exports_ps |= 1;
+
 	if (rshader->uses_kill)
 		db_shader_control |= S_02880C_KILL_ENABLE(1);
 
@@ -4137,14 +4142,17 @@ void evergreen_update_db_shader_control(struct r600_context * rctx)
 		return;
 	}
 
+	const bool alpha_to_one_and_coverage = rctx->ps_shader->current->key.ps.alpha_to_one_and_coverage;
 	dual_export = rctx->cb_state.export_16bpc &&
-		      !rctx->ps_shader->current->ps_depth_export;
+		      !rctx->ps_shader->current->ps_depth_export &&
+		      !alpha_to_one_and_coverage;
 
 	db_shader_control = rctx->ps_shader->current->db_shader_control |
 			    S_02880C_DUAL_EXPORT_ENABLE(dual_export) |
 			    S_02880C_DB_SOURCE_FORMAT(dual_export ? V_02880C_EXPORT_DB_TWO :
 								    V_02880C_EXPORT_DB_FULL) |
-			    S_02880C_ALPHA_TO_MASK_DISABLE(rctx->cb_state.cb0_is_integer);
+			    S_02880C_ALPHA_TO_MASK_DISABLE(rctx->cb_state.cb0_is_integer) |
+			    S_02880C_COVERAGE_TO_MASK_ENABLE(alpha_to_one_and_coverage);
 
 	/* When alpha test is enabled we can't trust the hw to make the proper
 	 * decision on the order in which ztest should be run related to fragment
@@ -5244,6 +5252,7 @@ void eg_trace_emit(struct r600_context *rctx)
 static void evergreen_emit_set_append_cnt(struct r600_context *rctx,
 					  const struct r600_shader_atomic *atomic,
 					  struct r600_resource *resource,
+					  const unsigned buffer_offset,
 					  uint32_t pkt_flags)
 {
 	struct radeon_cmdbuf *cs = &rctx->b.gfx.cs;
@@ -5251,7 +5260,7 @@ static void evergreen_emit_set_append_cnt(struct r600_context *rctx,
 						   resource,
 						   RADEON_USAGE_READ |
 						   RADEON_PRIO_SHADER_RW_BUFFER);
-	uint64_t dst_offset = resource->gpu_address + (atomic->start * 4);
+	uint64_t dst_offset = resource->gpu_address + (atomic->start * 4) + buffer_offset;
 	uint32_t base_reg_0 = R_02872C_GDS_APPEND_COUNT_0;
 
 	uint32_t reg_val = (base_reg_0 + atomic->hw_idx * 4 - EVERGREEN_CONTEXT_REG_OFFSET) >> 2;
@@ -5269,6 +5278,7 @@ static void evergreen_emit_set_append_cnt(struct r600_context *rctx,
 static void evergreen_emit_event_write_eos(struct r600_context *rctx,
 					   const struct r600_shader_atomic *atomic,
 					   struct r600_resource *resource,
+					   const unsigned buffer_offset,
 					   uint32_t pkt_flags)
 {
 	struct radeon_cmdbuf *cs = &rctx->b.gfx.cs;
@@ -5278,7 +5288,7 @@ static void evergreen_emit_event_write_eos(struct r600_context *rctx,
 						   resource,
 						   RADEON_USAGE_WRITE |
 						   RADEON_PRIO_SHADER_RW_BUFFER);
-	uint64_t dst_offset = resource->gpu_address + (atomic->start * 4);
+	uint64_t dst_offset = resource->gpu_address + (atomic->start * 4) + buffer_offset;
 	uint32_t reg_val = (base_reg_0 + atomic->hw_idx * 4) >> 2;
 
 	assert(atomic->count == 1);
@@ -5298,6 +5308,7 @@ static void evergreen_emit_event_write_eos(struct r600_context *rctx,
 static void cayman_emit_event_write_eos(struct r600_context *rctx,
 					const struct r600_shader_atomic *atomic,
 					struct r600_resource *resource,
+					const unsigned buffer_offset,
 					uint32_t pkt_flags)
 {
 	struct radeon_cmdbuf *cs = &rctx->b.gfx.cs;
@@ -5306,7 +5317,7 @@ static void cayman_emit_event_write_eos(struct r600_context *rctx,
 						   resource,
 						   RADEON_USAGE_WRITE |
 						   RADEON_PRIO_SHADER_RW_BUFFER);
-	uint64_t dst_offset = resource->gpu_address + (atomic->start * 4);
+	uint64_t dst_offset = resource->gpu_address + (atomic->start * 4) + buffer_offset;
 
 	if (pkt_flags == RADEON_CP_PACKET3_COMPUTE_MODE)
 		event = EVENT_TYPE_CS_DONE;
@@ -5324,6 +5335,7 @@ static void cayman_emit_event_write_eos(struct r600_context *rctx,
 static void cayman_write_count_to_gds(struct r600_context *rctx,
 				      const struct r600_shader_atomic *atomic,
 				      struct r600_resource *resource,
+				      const unsigned buffer_offset,
 				      const uint32_t pkt_flags)
 {
 	struct radeon_cmdbuf *cs = &rctx->b.gfx.cs;
@@ -5331,7 +5343,7 @@ static void cayman_write_count_to_gds(struct r600_context *rctx,
 						   resource,
 						   RADEON_USAGE_READ |
 						   RADEON_PRIO_SHADER_RW_BUFFER);
-	uint64_t dst_offset = resource->gpu_address + (atomic->start * 4);
+	uint64_t dst_offset = resource->gpu_address + (atomic->start * 4) + buffer_offset;
 
 	radeon_emit(cs, PKT3(PKT3_CP_DMA, 4, 0) | pkt_flags);
 	radeon_emit(cs, dst_offset & 0xffffffff);
@@ -5457,13 +5469,14 @@ void evergreen_emit_atomic_buffer_setup(struct r600_context *rctx,
 
 	for (int i = 0; i < global_atomic_count; i++) {
 		const struct r600_shader_atomic *atomic = &combined_atomics[i];
-		struct r600_resource *resource = r600_as_resource(astate->buffer[atomic->resource_id].buffer);
+		const struct pipe_shader_buffer *const atomic_buffer = &astate->buffer[atomic->resource_id];
+		struct r600_resource *resource = r600_as_resource(atomic_buffer->buffer);
 		assert(resource);
 
 		if (rctx->b.gfx_level == CAYMAN)
-			cayman_write_count_to_gds(rctx, atomic, resource, pkt_flags);
+			cayman_write_count_to_gds(rctx, atomic, resource, atomic_buffer->buffer_offset, pkt_flags);
 		else
-			evergreen_emit_set_append_cnt(rctx, atomic, resource, pkt_flags);
+			evergreen_emit_set_append_cnt(rctx, atomic, resource, atomic_buffer->buffer_offset, pkt_flags);
 	}
 }
 
@@ -5487,13 +5500,14 @@ void evergreen_emit_atomic_buffer_save(struct r600_context *rctx,
 
 	for (int i = 0; i < global_atomic_count; i++) {
 		const struct r600_shader_atomic *atomic = &combined_atomics[i];
-		struct r600_resource *resource = r600_as_resource(astate->buffer[atomic->resource_id].buffer);
+		const struct pipe_shader_buffer *const atomic_buffer = &astate->buffer[atomic->resource_id];
+		struct r600_resource *resource = r600_as_resource(atomic_buffer->buffer);
 		assert(resource);
 
 		if (rctx->b.gfx_level == CAYMAN)
-			cayman_emit_event_write_eos(rctx, atomic, resource, pkt_flags);
+			cayman_emit_event_write_eos(rctx, atomic, resource, atomic_buffer->buffer_offset, pkt_flags);
 		else
-			evergreen_emit_event_write_eos(rctx, atomic, resource, pkt_flags);
+			evergreen_emit_event_write_eos(rctx, atomic, resource, atomic_buffer->buffer_offset, pkt_flags);
 	}
 
 	if (pkt_flags == RADEON_CP_PACKET3_COMPUTE_MODE)

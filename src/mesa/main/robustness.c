@@ -140,10 +140,5 @@ _mesa_GetGraphicsResetStatusARB( void )
    if (status != GL_NO_ERROR)
       _mesa_set_context_lost_dispatch(ctx);
 
-   if (!ctx->Driver.GetGraphicsResetStatus && (MESA_VERBOSE & VERBOSE_API))
-      _mesa_debug(ctx,
-                  "glGetGraphicsResetStatusARB always returns GL_NO_ERROR "
-                  "because the driver doesn't track reset status.\n");
-
    return status;
 }

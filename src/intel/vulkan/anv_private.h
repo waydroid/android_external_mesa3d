@@ -304,15 +304,18 @@ get_max_vbs(const struct intel_device_info *devinfo) {
 #define ANV_TRTT_L1_NULL_TILE_VAL 0
 #define ANV_TRTT_L1_INVALID_TILE_VAL 1
 
-/* The binding table entry id disabled, the shader can write to it and the
+/* The binding table entry is disabled, the shader can write to it and the
  * driver should use a null surface state so that writes are discarded.
  */
 #define ANV_COLOR_OUTPUT_DISABLED (0xff)
-/* The binding table entry id unused, the shader does not write to it and the
+/* The binding table entry is unused, the shader does not write to it and the
  * driver can leave whatever surface state was used before. Transitioning
  * to/from this entry does not require render target cache flush.
  */
 #define ANV_COLOR_OUTPUT_UNUSED   (0xfe)
+/* The binding table entry is unknown.
+ */
+#define ANV_COLOR_OUTPUT_UNKNOWN  (0xfd)
 
 static inline uint32_t
 align_down_npot_u32(uint32_t v, uint32_t a)
@@ -1518,6 +1521,8 @@ struct anv_physical_device {
     bool                                        emu_astc_ldr;
     /* true if FCV optimization should be disabled. */
     bool                                        disable_fcv;
+    /* true if EXT_subgroup_size_control extension should be disabled. */
+    bool                                        brw_disable_subgroup_size_control;
     /**/
     bool                                        uses_ex_bso;
 
@@ -4988,7 +4993,12 @@ static inline bool
 anv_cmd_buffer_is_compute_queue(const struct anv_cmd_buffer *cmd_buffer)
 {
    struct anv_queue_family *queue_family = cmd_buffer->queue_family;
-   return queue_family->engine_class == INTEL_ENGINE_CLASS_COMPUTE;
+   /* Either it's a RCS engine masquerading as a compute queue, or it's an
+    * actual CCS.
+    */
+   return ((queue_family->queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0 &&
+           queue_family->engine_class == INTEL_ENGINE_CLASS_RENDER) ||
+          queue_family->engine_class == INTEL_ENGINE_CLASS_COMPUTE;
 }
 
 static inline bool

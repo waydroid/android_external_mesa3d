@@ -225,15 +225,7 @@ tu_lrz_init_state(struct tu_cmd_buffer *cmd,
    bool has_gpu_tracking =
       cmd->device->physical_device->info->props.has_lrz_dir_tracking;
 
-   if (!has_gpu_tracking && !clears_depth)
-      return;
-
-   /* Reusing previous state doesn't work with FDM offset because the LRZ
-    * image is offsetted.
-    */
-   if ((view->image->vk.create_flags &
-        VK_IMAGE_CREATE_FRAGMENT_DENSITY_MAP_OFFSET_BIT_EXT) &&
-       !clears_depth)
+   if (!has_gpu_tracking && (!clears_depth || cmd->state.resuming))
       return;
 
    /* We need to always have an LRZ view just to disable it if there is a
@@ -244,6 +236,14 @@ tu_lrz_init_state(struct tu_cmd_buffer *cmd,
     */
    cmd->state.lrz.image_view = view;
    cmd->state.lrz.store = att->store;
+
+   /* Reusing previous state doesn't work with FDM offset because the LRZ
+    * image is offsetted.
+    */
+   if ((view->image->vk.create_flags &
+        VK_IMAGE_CREATE_FRAGMENT_DENSITY_MAP_OFFSET_BIT_EXT) &&
+       !clears_depth)
+      return;
 
    if (!clears_depth && !att->load)
       return;

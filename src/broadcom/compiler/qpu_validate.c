@@ -81,7 +81,7 @@ fail_instr(struct v3d_qpu_validate_state *state, const char *msg)
 static bool
 in_branch_delay_slots(struct v3d_qpu_validate_state *state)
 {
-        return (state->ip - state->last_branch_ip) < 3;
+        return (state->ip - state->last_branch_ip) < 4;
 }
 
 static bool
@@ -130,8 +130,16 @@ qpu_validate_inst(struct v3d_qpu_validate_state *state, struct qinst *qinst)
                 fail_instr(state, "Implicit branch MSF read after TLB Z write");
         }
 
-        if (inst->type != V3D_QPU_INSTR_TYPE_ALU)
+        if (inst->type == V3D_QPU_INSTR_TYPE_BRANCH) {
+                if (in_branch_delay_slots(state))
+                        fail_instr(state, "branch in a branch delay slot.");
+                if (in_thrsw_delay_slots(state))
+                        fail_instr(state, "branch in a THRSW delay slot.");
+                state->last_branch_ip = state->ip;
                 return;
+        }
+
+        assert(inst->type == V3D_QPU_INSTR_TYPE_ALU);
 
         if (inst->alu.mul.op == V3D_QPU_M_MULTOP)
             state->rtop_valid = true;
@@ -382,14 +390,6 @@ qpu_validate_inst(struct v3d_qpu_validate_state *state, struct qinst *qinst)
         if (state->rtop_valid && state->ip == state->last_thrsw_ip + 2) {
                 state->rtop_hazard = true;
                 state->rtop_valid = false;
-        }
-
-        if (inst->type == V3D_QPU_INSTR_TYPE_BRANCH) {
-                if (in_branch_delay_slots(state))
-                        fail_instr(state, "branch in a branch delay slot.");
-                if (in_thrsw_delay_slots(state))
-                        fail_instr(state, "branch in a THRSW delay slot.");
-                state->last_branch_ip = state->ip;
         }
 }
 

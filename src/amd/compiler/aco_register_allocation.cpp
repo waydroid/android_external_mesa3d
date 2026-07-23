@@ -1618,6 +1618,12 @@ get_reg_specified(ra_ctx& ctx, const RegisterFile& reg_file, RegClass rc,
    if (reg.reg_b % info.data_stride)
       return false;
 
+   /* In other cases, we assume the caller ensured that this is fine. */
+   if (info.rc.bytes() > rc.bytes()) {
+      if (reg_file.test(reg, info.rc.bytes()))
+         return false;
+   }
+
    assert(util_is_power_of_two_nonzero(info.stride));
    reg.reg_b &= ~(info.stride - 1);
 
@@ -2639,7 +2645,7 @@ get_reg_phi(ra_ctx& ctx, IDSet& live_in, RegisterFile& register_file,
 {
    std::vector<parallelcopy> parallelcopy;
    PhysReg reg = get_reg(ctx, register_file, tmp, parallelcopy, phi);
-   update_renames(ctx, register_file, parallelcopy, phi);
+   update_renames(ctx, register_file, parallelcopy, ctx.phi_dummy);
 
    /* process parallelcopy */
    for (struct parallelcopy pc : parallelcopy) {

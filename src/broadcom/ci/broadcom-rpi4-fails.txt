@@ -1000,4 +1000,3 @@ TransferPixelsTest,Fail
 
 # uprev Piglit in Mesa
 spec@arb_texture_view@tex-view,Fail
-

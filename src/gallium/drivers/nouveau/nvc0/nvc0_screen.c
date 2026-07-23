@@ -318,7 +318,7 @@ nvc0_init_screen_caps(struct nvc0_screen *screen)
    caps->legacy_math_rules = true;
    caps->doubles = true;
    caps->int64 = true;
-   caps->tgsi_tex_txf_lz = true;
+   caps->tgsi_tex_txf_lz = false;
    caps->shader_clock = true;
    caps->compute = true;
    caps->can_bind_const_buffer_as_vertex = true;

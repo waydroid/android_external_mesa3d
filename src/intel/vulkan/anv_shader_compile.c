@@ -65,14 +65,8 @@ static bool is_alu1_iand_0x1f(nir_alu_instr *alu)
    return false;
 }
 
-static bool
-detect_simd32_shuffle(nir_builder *b,
-                      nir_intrinsic_instr *intrin,
-                      void *data)
+static bool is_simd32_shuffle(nir_intrinsic_instr *intrin)
 {
-   if (intrin->intrinsic != nir_intrinsic_shuffle)
-      return false;
-
    nir_alu_instr *alu1 = nir_src_as_alu(intrin->src[1]);
    if (alu1 == NULL)
       return false;
@@ -86,6 +80,96 @@ detect_simd32_shuffle(nir_builder *b,
    }
 
    return false;
+}
+
+/* Try to detect shaders testing with a sequence like this :
+ *
+ * 32x3    %49 = @load_local_invocation_id
+ * 32    %1673 = load_const (0xffffffe0 = -32 = 4294967264)
+ * 32    %1674 = iand %49.x, %1673 (0xffffffe0)
+ * 32    %1675 = @load_subgroup_size
+ * 32    %1676 = umod %1674, %1675
+ *
+ * This sequence appears to be targetted at subgroup sizes larger than 32. The
+ * problem in this sequence is that subgroup size is expected to be >= 32 to
+ * match the masking of local_invocation_id above. If inferior, the umod
+ * operation returns the same value as if the subgroup was 32.
+ */
+static bool is_alu_used_for_umod_subgroup_size(nir_alu_instr *in_alu)
+{
+   nir_foreach_use(src, &in_alu->def) {
+      nir_instr *instr = nir_src_parent_instr(src);
+      if (instr->type != nir_instr_type_alu)
+         continue;
+
+      nir_alu_instr *alu = nir_instr_as_alu(instr);
+      if (alu->op != nir_op_umod &&
+          alu->op != nir_op_imod)
+         continue;
+
+      for (uint32_t i = 0; i < 2; i++) {
+         if (&alu->src[i].src == src)
+            continue;
+
+         if (!nir_src_is_intrinsic(alu->src[i].src) ||
+             nir_src_as_intrinsic(alu->src[i].src)->intrinsic != nir_intrinsic_load_subgroup_size)
+            continue;
+
+         return true;
+      }
+   }
+
+   return false;
+}
+
+static bool
+is_local_invoc_id_used_with_simd32_assumption(nir_intrinsic_instr *subgroup_inv)
+{
+   nir_foreach_use(src, &subgroup_inv->def) {
+      nir_instr *instr = nir_src_parent_instr(src);
+      if (instr->type != nir_instr_type_alu)
+         continue;
+
+      nir_alu_instr *alu = nir_instr_as_alu(instr);
+      if (alu->op != nir_op_iand)
+         continue;
+
+      /* nir_print_instr(&alu->instr, stderr); */
+      /* fprintf(stderr, "\n"); */
+
+      for (uint32_t i = 0; i < 2; i++) {
+         if (&alu->src[i].src == src)
+            continue;
+
+         if (!nir_src_is_const(alu->src[i].src))
+            continue;
+
+         if (nir_src_as_uint(alu->src[i].src) != 0xffffffe0)
+            continue;
+
+         if (is_alu_used_for_umod_subgroup_size(alu))
+            return true;
+      }
+   }
+
+   return false;
+}
+
+static bool
+detect_simd32_requirement(nir_builder *b,
+                          nir_intrinsic_instr *intrin,
+                          void *data)
+{
+   switch (intrin->intrinsic) {
+   case nir_intrinsic_shuffle:
+      return is_simd32_shuffle(intrin);
+
+   case nir_intrinsic_load_local_invocation_id:
+      return is_local_invoc_id_used_with_simd32_assumption(intrin);
+
+   default:
+      return false;
+   }
 }
 
 /* List of game-specific workarounds identified by BLAKE3 hash of the shader.
@@ -153,6 +237,9 @@ anv_shader_init_uuid(struct anv_physical_device *device)
     */
    struct mesa_sha1 ctx;
    _mesa_sha1_init(&ctx);
+
+   const bool always_bindless = unlikely(device->instance->debug & ANV_DEBUG_BINDLESS);
+   _mesa_sha1_update(&ctx, &always_bindless, sizeof(always_bindless));
 
    const bool indirect_descriptors = device->indirect_descriptors;
    _mesa_sha1_update(&ctx, &indirect_descriptors, sizeof(indirect_descriptors));
@@ -810,7 +897,7 @@ anv_fixup_subgroup_size(struct anv_device *device, nir_shader *shader)
        info->min_subgroup_size != info->max_subgroup_size &&
        info->uses_wide_subgroup_intrinsics &&
        nir_shader_intrinsics_pass(shader,
-                                  detect_simd32_shuffle,
+                                  detect_simd32_requirement,
                                   nir_metadata_all,
                                   NULL)) {
       info->max_subgroup_size = BRW_SUBGROUP_SIZE;

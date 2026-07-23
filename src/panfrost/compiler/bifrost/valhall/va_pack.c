@@ -250,6 +250,8 @@ va_pack_widen(const bi_instr *I, enum bi_swizzle swz, enum va_size size)
       switch (swz) {
       case BI_SWIZZLE_B0123:
          return VA_SWIZZLES_8_BIT_B0123;
+      case BI_SWIZZLE_B3210:
+         return VA_SWIZZLES_8_BIT_B3210;
       case BI_SWIZZLE_B0101:
          return VA_SWIZZLES_8_BIT_B0101;
       case BI_SWIZZLE_B2323:

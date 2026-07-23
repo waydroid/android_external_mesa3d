@@ -7,6 +7,11 @@ dEQP-VK.memory.pipeline_barrier.transfer_dst_uniform_buffer.1048576
 dEQP-VK.sparse_resources.buffer.ssbo.sparse_residency.buffer_size_2_24
 dEQP-VK.sparse_resources.buffer.ssbo.sparse_residency.non_resident_buffer_copy_src_alloc_none_16777216
 
+# deqp-vk: ../src/panfrost/vulkan/panvk_image.c:346: panvk_image_get_mod_from_list: Assertion `!"Invalid modifier"' failed.
+dEQP-VK.wsi.wayland.swapchain.create.image_extent
+dEQP-VK.wsi.wayland.swapchain.simulate_oom.image_extent
+
+
 angle-dEQP-GLES3.functional.multisample.fbo_4_samples.proportionality_sample_coverage
 angle-dEQP-GLES3.functional.multisample.fbo_max_samples.constancy_alpha_to_coverage
 angle-KHR-GLES31.core.compute_shader.sso-case2

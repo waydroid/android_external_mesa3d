@@ -209,6 +209,7 @@ static const driOptionDescription radv_dri_options[] = {
       DRI_CONF_RADV_WAIT_FOR_VM_MAP_UPDATES(false)
       DRI_CONF_RADV_NO_IMPLICIT_VARYING_SUBGROUP_SIZE(false)
       DRI_CONF_RADV_HIDE_REBAR_ON_DGPU(false)
+      DRI_CONF_RADV_FORCE_64_BYTE_SAMPLED_IMAGE(false)
    DRI_CONF_SECTION_END
 };
 // clang-format on
@@ -256,6 +257,7 @@ radv_init_dri_debug_options(struct radv_instance *instance)
 
    drirc->debug.rt_wave64 = driQueryOptionb(&drirc->options, "radv_rt_wave64");
    drirc->debug.hide_rebar_on_dgpu = driQueryOptionb(&drirc->options, "radv_hide_rebar_on_dgpu");
+   drirc->debug.force_64_byte_sampled_image = driQueryOptionb(&drirc->options, "radv_force_64_byte_sampled_image");
 }
 
 static void

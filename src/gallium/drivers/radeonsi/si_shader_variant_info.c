@@ -38,7 +38,7 @@ void si_shader_update_spi_shader_formats(struct si_shader *shader, nir_shader *n
    for (i = 0; i < num_targets; i++) {
       unsigned spi_format = (spi_shader_col_format >> (i * 4)) & 0xf;
 
-      if (spi_format && (colors_written & 1u << num_mrts)) {
+      if (spi_format && (colors_written & 1u << i)) {
          value |= spi_format << (num_mrts * 4);
          num_mrts++;
       }

@@ -2012,7 +2012,7 @@ wsi_create_buffer_blit_context(const struct wsi_swapchain *chain,
 
    VkMemoryRequirements reqs;
    wsi->GetBufferMemoryRequirements(chain->device, image->blit.buffer, &reqs);
-   assert(reqs.size <= info->linear_size);
+   assert(reqs.size >= info->linear_size);
 
    struct wsi_memory_allocate_info memory_wsi_info = {
       .sType = VK_STRUCTURE_TYPE_WSI_MEMORY_ALLOCATE_INFO_MESA,

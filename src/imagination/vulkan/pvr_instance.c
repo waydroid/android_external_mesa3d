@@ -306,7 +306,7 @@ out:
 }
 
 static bool
-pvr_get_driver_build_sha(uint8_t sha_out[const static BUILD_ID_EXPECTED_HASH_LENGTH])
+pvr_get_driver_build_sha(struct pvr_instance *instance)
 {
    const struct build_id_note *note;
    unsigned build_id_len;
@@ -323,7 +323,8 @@ pvr_get_driver_build_sha(uint8_t sha_out[const static BUILD_ID_EXPECTED_HASH_LEN
       return false;
    }
 
-   memcpy(sha_out, build_id_data(note), BUILD_ID_EXPECTED_HASH_LENGTH);
+   STATIC_ASSERT(sizeof(instance->driver_build_sha) == SHA1_DIGEST_LENGTH);
+   copy_build_id_to_sha1(instance->driver_build_sha, note);
 
    return true;
 }
@@ -373,7 +374,7 @@ VkResult pvr_CreateInstance(const VkInstanceCreateInfo *pCreateInfo,
 
    VG(VALGRIND_CREATE_MEMPOOL(instance, 0, false));
 
-   if (!pvr_get_driver_build_sha(instance->driver_build_sha)) {
+   if (!pvr_get_driver_build_sha(instance)) {
       result = vk_errorf(NULL,
                          VK_ERROR_INITIALIZATION_FAILED,
                          "Failed to get driver build sha.");

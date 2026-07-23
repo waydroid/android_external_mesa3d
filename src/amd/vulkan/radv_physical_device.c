@@ -284,6 +284,7 @@ radv_physical_device_init_cache_key(struct radv_physical_device *pdev)
    key->ge_wave32 = pdev->ge_wave_size == 32;
    key->invariant_geom = instance->drirc.debug.invariant_geom;
    key->no_fmask = !!(instance->debug_flags & RADV_DEBUG_NO_FMASK);
+   key->force_64_byte_sampled_image = pdev->force_64_byte_sampled_image;
    key->no_ngg_gs = instance->drirc.performance.disable_ngg_gs;
    key->no_rt = !!(instance->debug_flags & RADV_DEBUG_NO_RT);
    key->ps_wave32 = pdev->ps_wave_size == 32;
@@ -2429,6 +2430,8 @@ radv_physical_device_try_create(struct radv_instance *instance, drmDevicePtr drm
    pdev->dcc_msaa_allowed = (instance->perftest_flags & RADV_PERFTEST_DCC_MSAA);
 
    pdev->use_fmask = pdev->info.gfx_level < GFX11 && !(instance->debug_flags & RADV_DEBUG_NO_FMASK);
+
+   pdev->force_64_byte_sampled_image = !pdev->use_fmask && instance->drirc.debug.force_64_byte_sampled_image;
 
    pdev->use_hiz = !(instance->debug_flags & RADV_DEBUG_NO_HIZ);
 

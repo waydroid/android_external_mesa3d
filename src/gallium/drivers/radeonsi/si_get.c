@@ -1158,7 +1158,6 @@ void si_init_screen_caps(struct si_screen *sscreen)
    caps->stream_output_pause_resume = true;
    caps->stream_output_interleave_buffers = true;
    caps->doubles = true;
-   caps->tgsi_tex_txf_lz = true;
    caps->tes_layer_viewport = true;
    caps->bindless_texture = true;
    caps->query_timestamp = true;

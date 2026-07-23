@@ -2859,7 +2859,8 @@ intrinsic("smp_pco", src_comp=[16, 4, 4], dest_comp=0, indices=[SMP_FLAGS_PCO, R
 
 # smp_coeffs_pco(data, tex_state, smp_state)
 # Returns the calculated sampling coefficients for the given data and state words.
-intrinsic("smp_coeffs_pco", src_comp=[16, 4, 4], dest_comp=8, indices=[SMP_FLAGS_PCO, RANGE], bit_sizes=[32])
+# Actually outputs 7/14 components, but NIR doesn't support those for num_components, so fake it as 16 for now.
+intrinsic("smp_coeffs_pco", src_comp=[16, 4, 4], dest_comp=16, indices=[SMP_FLAGS_PCO, RANGE], bit_sizes=[32])
 
 # smp_raw_pco(data, tex_state, smp_state)
 # Returns the raw sampling data for the given data and state words.

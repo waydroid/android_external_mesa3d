@@ -1937,22 +1937,19 @@ can_use_resource_barrier(const struct intel_device_info *devinfo,
        engine_class != INTEL_ENGINE_CLASS_COMPUTE)
       return false;
 
-   /* Wa_18039014283:
+   /* Split barriers (VkEvent) are tricky to support with resource barrier.
     *
-    * RESOURCE_BARRIER instructions with a Type=Signal, SignalStage=GPGPU are
-    * not functional. Since the main use case for this is VkEvent and VkEvent
-    * might not have exactly matching informations on both signal/wait sides
-    * (see
-    * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdWaitEvents.html),
-    * this is somewhat unusable.
+    * From Bspec 56054 (RESOURCE_BARRIER_BODY):
+    *    "Split barrier pairs need to have identical values for all
+    *     fields other than the barrier type."
     *
-    * We're also seeing other problems with this, for example with
-    * dEQP-VK.synchronization2.op.single_queue.event.write_blit_image_read_copy_image_to_buffer.image_128_r32_uint
-    * So HW might be more broken than expected.
+    * Vulkan does not require signal and wait barriers to have identical values, see:
+    * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdWaitEvents.html
+    *
+    * This rule handles also Wa_18039014283.
     */
-   if (intel_needs_workaround(devinfo, 18039014283) &&
-       (!anv_address_is_null(signal_addr) ||
-        !anv_address_is_null(wait_addr)))
+   if (!anv_address_is_null(signal_addr) ||
+       !anv_address_is_null(wait_addr))
       return false;
 
    /* The HW doesn't support signaling from the top of pipeline */
@@ -2745,7 +2742,7 @@ emit_binding_table(struct anv_cmd_buffer *cmd_buffer,
          bt_map[s] = 0;
          break;
 
-      case ANV_DESCRIPTOR_SET_COLOR_ATTACHMENTS:
+      case ANV_DESCRIPTOR_SET_COLOR_ATTACHMENTS: {
          /* Color attachment binding */
          assert(shader->vk.stage == MESA_SHADER_FRAGMENT);
          uint32_t index = binding->index < MAX_RTS ?
@@ -2762,6 +2759,7 @@ emit_binding_table(struct anv_cmd_buffer *cmd_buffer,
          assert(surface_state.map);
          bt_map[s] = surface_state.offset + state_offset;
          break;
+      }
 
       case ANV_DESCRIPTOR_SET_DESCRIPTORS: {
          struct anv_descriptor_set *set =
@@ -6547,6 +6545,9 @@ void genX(CmdBeginRendering)(
     */
    gfx->dirty |= ANV_CMD_DIRTY_ALL_SHADERS(cmd_buffer->device);
 
+   memset(gfx->color_output_mapping, ANV_COLOR_OUTPUT_UNKNOWN,
+          sizeof(gfx->color_output_mapping));
+
 #if GFX_VER >= 11
    if (render_target_change) {
       /* The PIPE_CONTROL command description says:
@@ -7157,7 +7158,7 @@ void genX(cmd_emit_timestamp)(struct anv_batch *batch,
 
       GENX(EXECUTE_INDIRECT_DISPATCH_pack)
       (batch, dwords, &(struct GENX(EXECUTE_INDIRECT_DISPATCH)) {
-            .MOCS = anv_mocs(device, NULL, 0),
+            .MOCSIndex = MOCS_GET_INDEX(anv_mocs(device, NULL, 0)),
             .body = {
                .PostSync = (struct GENX(POSTSYNC_DATA)) {
                   .Operation = WriteTimestamp,

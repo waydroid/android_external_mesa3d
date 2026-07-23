@@ -418,9 +418,13 @@ radv_pipeline_needed_dynamic_state(const struct radv_device *device, const struc
 
    /* Disable dynamic states that are useless when rasterization is disabled. */
    if (!raster_enabled) {
-      states = RADV_DYNAMIC_PRIMITIVE_TOPOLOGY | RADV_DYNAMIC_VERTEX_INPUT_BINDING_STRIDE |
-               RADV_DYNAMIC_PRIMITIVE_RESTART_ENABLE | RADV_DYNAMIC_RASTERIZER_DISCARD_ENABLE |
-               RADV_DYNAMIC_VERTEX_INPUT;
+      states = RADV_DYNAMIC_RASTERIZER_DISCARD_ENABLE;
+
+      if (state->ia)
+         states |= RADV_DYNAMIC_PRIMITIVE_TOPOLOGY | RADV_DYNAMIC_PRIMITIVE_RESTART_ENABLE;
+
+      if (state->vi)
+         states |= RADV_DYNAMIC_VERTEX_INPUT | RADV_DYNAMIC_VERTEX_INPUT_BINDING_STRIDE;
 
       if (pipeline->active_stages & VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT)
          states |= RADV_DYNAMIC_PATCH_CONTROL_POINTS | RADV_DYNAMIC_TESS_DOMAIN_ORIGIN;

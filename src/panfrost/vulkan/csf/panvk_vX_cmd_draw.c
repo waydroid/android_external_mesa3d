@@ -1694,7 +1694,8 @@ prepare_vs(struct panvk_cmd_buffer *cmdbuf, const struct panvk_draw_info *draw)
                       vs_desc_state->res_table);
 
 #if PAN_ARCH >= 12
-      if (gfx_state_dirty(cmdbuf, VS))
+      if (gfx_state_dirty(cmdbuf, VS) ||
+          dyn_gfx_state_dirty(cmdbuf, IA_PRIMITIVE_TOPOLOGY))
          cs_move64_to(b, cs_sr_reg64(b, IDVS, VERTEX_SPD), get_vs_all_spd(cmdbuf));
 #else
       if (gfx_state_dirty(cmdbuf, VS) ||
@@ -2134,13 +2135,12 @@ prepare_dcd(struct panvk_cmd_buffer *cmdbuf,
 }
 
 static void
-prepare_index_buffer(struct panvk_cmd_buffer *cmdbuf,
-                     struct panvk_draw_info *draw)
+prepare_index_buffer(struct panvk_cmd_buffer *cmdbuf)
 {
    struct cs_builder *b =
       panvk_get_cs_builder(cmdbuf, PANVK_SUBQUEUE_VERTEX_TILER);
 
-   if (draw->index.size && gfx_state_dirty(cmdbuf, IB)) {
+   if (gfx_state_dirty(cmdbuf, IB)) {
       cs_move32_to(b, cs_sr_reg32(b, IDVS, INDEX_BUFFER_SIZE),
                    cmdbuf->state.gfx.ib.size);
 
@@ -2335,7 +2335,7 @@ prepare_draw(struct panvk_cmd_buffer *cmdbuf, struct panvk_draw_info *draw)
    uint32_t varying_size = get_varying_slots(cmdbuf) * 16;
 
    cs_update_vt_ctx(b) {
-      prepare_index_buffer(cmdbuf, draw);
+      prepare_index_buffer(cmdbuf);
 
       set_tiler_idvs_flags(b, cmdbuf, draw);
 

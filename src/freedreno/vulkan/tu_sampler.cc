@@ -184,7 +184,7 @@ tu_DestroySampler(VkDevice _device,
       fast_border_color =
          (sampler->descriptor[2] & A8XX_TEX_SAMP_2_FASTBORDERCOLOREN) != 0;
       border_color =
-         pkt_field_get(A8XX_TEX_SAMP_2_FASTBORDERCOLOR, sampler->descriptor[2]);
+         pkt_field_get(A8XX_TEX_SAMP_2_BCOLOR, sampler->descriptor[2]);
    } else {
       fast_border_color =
          (sampler->descriptor[2] & A6XX_TEX_SAMP_2_FASTBORDERCOLOREN) != 0;

@@ -902,6 +902,7 @@ void pco_lower_nir(pco_ctx *ctx, nir_shader *nir, pco_data *data)
             nir_lower_tex,
             &(nir_lower_tex_options){
                .lower_txd_cube_map = true,
+               .lower_tg4_offsets = true,
             });
    NIR_PASS(_, nir, pco_nir_lower_tex, data, ctx);
 

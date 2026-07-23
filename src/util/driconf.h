@@ -850,6 +850,10 @@
    DRI_CONF_OPT_B(radv_hide_rebar_on_dgpu, def, \
                   "Hide resizable bar on dGPUs by exposing a fake carveout of 256MiB.")
 
+#define DRI_CONF_RADV_FORCE_64_BYTE_SAMPLED_IMAGE(def) \
+   DRI_CONF_OPT_B(radv_force_64_byte_sampled_image, def, \
+                  "Force sampled images size to 64 bytes.")
+
 /**
  * \brief ANV specific configuration options
  */
@@ -947,6 +951,10 @@
 #define DRI_CONF_ANV_BARRIER_POST_TYPED_CLEAR_SHADER(def) \
    DRI_CONF_OPT_B(anv_barrier_post_typed_clear_shader, def, \
                   "Insert pipeline barriers post clearing shader on typed data")
+
+#define DRI_CONF_ANV_BRW_DISABLE_SUBGROUP_SIZE_CONTROL(def) \
+   DRI_CONF_OPT_B(anv_brw_disable_subgroup_size_control, def, \
+                  "Disable EXT_subgroup_size_control support when using brw compiler.")
 
 /**
  * \brief HASVK specific configuration options

@@ -5894,7 +5894,7 @@ void lp_build_nir_soa_func(struct gallivm_state *gallivm,
    }
    {
       struct lp_type bool_type;
-      bool_type = lp_int_type(type);
+      bool_type = lp_uint_type(type);
       bool_type.width /= 32;
       lp_build_context_init(&bld.bool_bld, gallivm, bool_type);
    }
@@ -5957,7 +5957,7 @@ void lp_build_nir_soa_func(struct gallivm_state *gallivm,
    }
    {
       struct lp_type bool_type;
-      bool_type = lp_int_type(elem_type);
+      bool_type = lp_uint_type(elem_type);
       bool_type.width /= 32;
       lp_build_context_init(&bld.scalar_bool_bld, gallivm, bool_type);
    }

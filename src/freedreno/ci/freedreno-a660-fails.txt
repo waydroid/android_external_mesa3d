@@ -41,8 +41,6 @@ gmem-dEQP-VK.transform_feedback.simple.draw_indirect_multiview_counter_offset_24
 nobin-dEQP-VK.transform_feedback.simple.draw_indirect_multiview_counter_offset_16,Fail
 
 # New failures with VKCTS 1.4.4.0
-dEQP-VK.binding_model.descriptor_buffer.traditional_buffer.capture_replay.sparse_buffer_descriptor_data_consistency_and_usage,Fail
-dEQP-VK.binding_model.descriptor_buffer.traditional_buffer.capture_replay.sparse_buffer_descriptor_data_consistency,Fail
 dEQP-VK.pipeline.monolithic.misc.identically_defined_layout,Fail
 dEQP-VK.renderpasses.dynamic_rendering.primary_cmd_buff.basic.partial_binding_depth_stencil,Fail
 dEQP-VK.tessellation.misc_draw.tess_factor_barrier_bug,Crash

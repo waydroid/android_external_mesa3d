@@ -88,6 +88,7 @@ lower_alu_instr(nir_builder *bld, nir_alu_instr *alu, unsigned bit_size)
    unsigned dst_bit_size = alu->def.bit_size;
 
    bld->cursor = nir_before_instr(&alu->instr);
+   bld->fp_math_ctrl = alu->fp_math_ctrl;
 
    /* Convert each source to the requested bit-size */
    nir_def *srcs[NIR_MAX_VEC_COMPONENTS] = { NULL };

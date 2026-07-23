@@ -13,6 +13,7 @@
 
 #include "util/bitscan.h"
 #include "util/list.h"
+#include "util/macros.h"
 #include "util/set.h"
 #include "util/u_debug.h"
 
@@ -1914,7 +1915,7 @@ ir3_src_is_first_in_group(struct ir3_register *src)
 #define foreach_src_in_alias_group_n(__alias, __alias_n, __instr, __start)     \
    for (struct ir3_register *__alias = __instr->srcs[__start];                 \
         __alias && (__alias->flags & IR3_REG_FIRST_ALIAS); __alias = NULL)     \
-      for (unsigned __i = __start, __alias_n = 0;                              \
+      for (unsigned __i = __start, UNUSED __alias_n = 0;                       \
            __i < __instr->srcs_count &&                                        \
            (__i == __start || !ir3_src_is_first_in_group(__instr->srcs[__i])); \
            __i++, __alias_n++)                                                 \

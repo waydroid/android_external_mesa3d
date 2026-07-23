@@ -1937,6 +1937,9 @@ static void pvr_init_fs_outputs_mrt(pco_data *data,
    unsigned u;
    pco_fs_data *fs = &data->fs;
 
+   if (!vk_render_pass_state_has_attachment_info(rp))
+      goto early_exit;
+
    for (u = 0; u < PVR_MAX_COLOR_ATTACHMENTS; u++) {
       if (!(rp->attachments & MESA_VK_RP_ATTACHMENT_COLOR_BIT(u)))
          continue;
@@ -1957,6 +1960,7 @@ static void pvr_init_fs_outputs_mrt(pco_data *data,
       }
    }
 
+early_exit:
    fs->z_replicate = ~0u;
 }
 

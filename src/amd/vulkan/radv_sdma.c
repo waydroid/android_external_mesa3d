@@ -718,12 +718,12 @@ radv_sdma_copy_image_t2t_scanline(const struct radv_device *device, struct radv_
 }
 
 bool
-radv_sdma_supports_image(const struct radv_device *device, const struct radv_image *image)
+radv_sdma_supports_image(const struct radv_device *device, const struct radv_image *image, bool to_image)
 {
    const struct radv_physical_device *pdev = radv_device_physical(device);
 
    if (radv_is_format_emulated(pdev, image->vk.format))
-      return false;
+      return to_image ? false : true;
 
    if (!pdev->info.sdma_supports_sparse &&
        (image->vk.create_flags & VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT))

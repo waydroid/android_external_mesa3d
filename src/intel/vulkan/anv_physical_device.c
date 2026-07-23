@@ -380,7 +380,7 @@ get_device_extensions(const struct anv_physical_device *device,
       .EXT_shader_subgroup_vote              = true,
       .EXT_shader_viewport_index_layer       = true,
       .EXT_shader_uniform_buffer_unsized_array = true,
-      .EXT_subgroup_size_control             = true,
+      .EXT_subgroup_size_control             = !device->brw_disable_subgroup_size_control,
 #ifdef ANV_USE_WSI_PLATFORM
       .EXT_swapchain_maintenance1            = true,
 #endif
@@ -1381,7 +1381,7 @@ get_properties(const struct anv_physical_device *pdevice,
                                                   desc_limits.max_images,
       .maxComputeSharedMemorySize               = MIN2(MAX_SLM_SIZE,
                                                        intel_device_info_get_max_slm_size(&pdevice->info)),
-      .maxComputeWorkGroupCount                 = { 65535, 65535, 65535 },
+      .maxComputeWorkGroupCount                 = { 0x7fffffff, 65535, 65535 },
       .maxComputeWorkGroupInvocations           = max_workgroup_size,
       .maxComputeWorkGroupSize = {
          max_workgroup_size,
@@ -2740,6 +2740,9 @@ anv_physical_device_try_create(struct vk_instance *vk_instance,
    }
    device->disable_fcv = device->info.verx10 >= 125 ||
                          instance->disable_fcv;
+   device->brw_disable_subgroup_size_control =
+      driQueryOptionb(&device->instance->dri_options,
+                      "anv_brw_disable_subgroup_size_control");
 
    result = anv_physical_device_init_heaps(device, fd);
    if (result != VK_SUCCESS)

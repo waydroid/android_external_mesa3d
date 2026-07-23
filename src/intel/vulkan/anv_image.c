@@ -1538,12 +1538,20 @@ add_all_surfaces_explicit_layout(
                               plane, image->vk.tiling);
       const VkSubresourceLayout *primary_layout = &drm_info->pPlaneLayouts[plane];
 
+      VkImageUsageFlags vk_usage = vk_image_usage(&image->vk, aspect);
+      isl_surf_usage_flags_t isl_usage =
+         anv_image_choose_isl_surf_usage(device->physical,
+                                         image->vk.format,
+                                         format_list_info,
+                                         image->vk.create_flags, vk_usage,
+                                         isl_extra_usage_flags, aspect,
+                                         image->vk.compr_flags);
+
       result = add_primary_surface(device, image, plane,
                                    format_plane,
                                    primary_layout->offset,
                                    primary_layout->rowPitch,
-                                   isl_tiling_flags,
-                                   isl_extra_usage_flags);
+                                   isl_tiling_flags, isl_usage);
       if (result != VK_SUCCESS)
          return result;
 
