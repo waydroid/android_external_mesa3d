@@ -2222,6 +2222,7 @@ svga_is_format_supported(struct pipe_screen *screen,
       case SVGA3D_B5G6R5_UNORM:
       case SVGA3D_B8G8R8X8_UNORM_SRGB:
       case SVGA3D_B8G8R8A8_UNORM_SRGB:
+      case SVGA3D_R8G8B8A8_UNORM:
       case SVGA3D_R8G8B8A8_UNORM_SRGB:
          break;
 
@@ -2350,6 +2351,7 @@ svga_is_dx_format_supported(struct pipe_screen *screen,
       case SVGA3D_B5G6R5_UNORM:
       case SVGA3D_B8G8R8X8_UNORM_SRGB:
       case SVGA3D_B8G8R8A8_UNORM_SRGB:
+      case SVGA3D_R8G8B8A8_UNORM:
       case SVGA3D_R8G8B8A8_UNORM_SRGB:
          break;
 
