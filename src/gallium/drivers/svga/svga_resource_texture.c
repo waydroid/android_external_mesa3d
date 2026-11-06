@@ -1195,6 +1195,14 @@ svga_texture_from_handle(struct pipe_screen *screen,
 
    tex->imported = true;
 
+   /* The surface was created and filled by someone else. Mark it as holding
+    * content, so that rendering to it does not first invalidate it: that
+    * discards what is there, and EGL platforms that re-import the same
+    * buffer every frame (Android) rely on it surviving for buffer age.
+    */
+   svga_define_texture_level(tex, 0, 0);
+   tex->surface_state = SVGA_SURFACE_STATE_UPDATED;
+
    ss->hud.num_resources++;
 
    return &tex->b;
